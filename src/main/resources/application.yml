@@ -1,0 +1,146 @@
+spring:
+  application:
+    name: behindy-backend
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:development}
+  mvc:
+    async:
+      request-timeout: 900000
+  http:
+    client:
+      timeout:
+        connect: 120000
+        read: 900000
+
+  datasource:
+    url: jdbc:postgresql://${DB_URL:localhost:5432/behindy}
+    username: ${DB_USER:behindy}
+    password: ${DB_PASS:password}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2000ms
+      jedis:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+
+behindy:
+  internal:
+    api-key: ${AI_SERVER_INTERNAL_API_KEY:behindy-internal-2025-secret-key}
+
+crypto:
+  field-secret-key: ${FIELD_KEY:default_field_key_32_characters_long}
+  table-secret-key: ${TABLE_KEY:default_table_key_32_characters_long}
+
+jwt:
+  secret: ${JWT_SECRET:default_jwt_secret_key}
+  access-validity: ${JWT_ACCESS_VALIDITY:900000}
+  refresh-validity: ${JWT_REFRESH_VALIDITY:604800000}
+
+cookie:
+  secure: ${COOKIE_SECURE:false}
+  same-site: ${COOKIE_SAME_SITE:strict}
+
+seoul:
+  metro:
+    api:
+      key: ${SEOUL_METRO_API_KEY:test_key}
+      base-url: http://swopenAPI.seoul.go.kr/api/subway
+      enabled: ${METRO_API_ENABLED:true}
+      timeout: 10000
+      retry-count: 3
+      enabled-lines: ${METRO_ENABLED_LINES:1,2,3,4}
+      update-interval: ${METRO_UPDATE_INTERVAL:360000}
+    cache:
+      ttl: ${SEOUL_METRO_CACHE_TTL:420}
+    monitoring:
+      daily-limit: ${METRO_DAILY_LIMIT:950}
+
+ai:
+  server:
+    url: ${AI_SERVER_URL:http://llmserver:8000}
+    timeout: ${AI_SERVER_TIMEOUT:900000}
+
+  story:
+    generation:
+      cron: ${AI_STORY_CRON:0 0 3 * * *}
+      test-interval: ${AI_STORY_TEST_INTERVAL:86400000}
+      min-stories-per-station: ${AI_STORY_MIN_PER_STATION:2}
+      retry-count: ${AI_STORY_RETRY_COUNT:3}
+      generation-delay: ${AI_STORY_GENERATION_DELAY:5000}
+      enabled: ${AI_STORY_GENERATION_ENABLED:true}
+      daily-limit: ${AI_STORY_DAILY_LIMIT:10} 
+      batch-size: ${AI_STORY_BATCH_SIZE:1} 
+      ai-timeout: ${AI_STORY_AI_TIMEOUT:900000}
+      health-check-timeout: ${AI_STORY_HEALTH_TIMEOUT:30000}
+
+demo:
+  accounts:
+    - email: ${DEMO_ACCOUNT_1_EMAIL:demo1@demo.com}
+      password: ${DEMO_ACCOUNT_1_PASSWORD:Demo123!}
+      name: ${DEMO_ACCOUNT_1_NAME:점심뭐먹지}
+    - email: ${DEMO_ACCOUNT_2_EMAIL:demo2@demo.com}
+      password: ${DEMO_ACCOUNT_2_PASSWORD:Demo123!}
+      name: ${DEMO_ACCOUNT_2_NAME:저녁뭐먹지}
+    - email: ${DEMO_ACCOUNT_3_EMAIL:demo3@demo.com}
+      password: ${DEMO_ACCOUNT_3_PASSWORD:Demo123!}
+      name: ${DEMO_ACCOUNT_3_NAME:야식뭐먹지}
+    - email: ${DEMO_ACCOUNT_4_EMAIL:demo4@demo.com}
+      password: ${DEMO_ACCOUNT_4_PASSWORD:Demo123!}
+      name: ${DEMO_ACCOUNT_4_NAME:야식뭐먹지}
+    - email: ${DEMO_ACCOUNT_5_EMAIL:demo5@demo.com}
+      password: ${DEMO_ACCOUNT_5_PASSWORD:Demo123!}
+      name: ${DEMO_ACCOUNT_5_NAME:야식뭐먹지}
+    - email: ${DEMO_ACCOUNT_6_EMAIL:demo6@demo.com}
+      password: ${DEMO_ACCOUNT_6_PASSWORD:Demo123!}
+      name: ${DEMO_ACCOUNT_6_NAME:야식뭐먹지}
+
+logging:
+  level:
+    com.example.backend: DEBUG
+    com.example.backend.service.AIStoryScheduler: DEBUG
+    com.example.backend.service.AIStoryService: DEBUG
+    com.example.backend.service.MetroDataScheduler: DEBUG
+    org.springframework.web.client.RestTemplate: INFO
+    org.apache.http: WARN
+    org.springframework.security: WARN
+    org.hibernate.SQL: ERROR
+    org.hibernate.type.descriptor.sql.BasicBinder: ERROR
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
+    display-request-duration: true
+  show-actuator: false

@@ -1,0 +1,20 @@
+logging:
+  level:
+    com.example.backend: INFO
+
+    com.example.backend.filter: WARN
+    com.example.backend.security.jwt: WARN
+
+    com.example.backend.service: INFO
+
+    com.example.backend.service.MetroDataScheduler: WARN
+    com.example.backend.service.AIStoryScheduler: WARN
+
+    org.springframework.web.client.RestTemplate: INFO
+    org.apache.http: WARN
+    org.springframework.security: WARN
+    org.hibernate.SQL: ERROR
+    org.hibernate.type.descriptor.sql.BasicBinder: ERROR
+
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"

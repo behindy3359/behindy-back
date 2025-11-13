@@ -1,0 +1,195 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest  # GitHub-hosted runner에서 빌드
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/behindy-backend:latest
+            ${{ secrets.DOCKER_USERNAME }}/behindy-backend:${{ github.sha }}
+          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/behindy-backend:buildcache
+          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/behindy-backend:buildcache,mode=max
+
+      - name: Image digest
+        run: echo "Image pushed successfully"
+
+  deploy:
+    runs-on: self-hosted  # EC2에서 배포만
+    needs: build
+
+    steps:
+      - name: Login to DockerHub
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Pull latest image
+        run: |
+          docker pull ${{ secrets.DOCKER_USERNAME }}/behindy-backend:latest
+          echo "Image pulled successfully"
+
+      - name: Determine deployment color
+        id: color
+        run: |
+          cd ~/behindy-ops
+          if docker ps --filter "name=^backend$" --format "{{.Names}}" | grep -q "^backend$"; then
+            echo "current=blue" >> $GITHUB_OUTPUT
+            echo "target=green" >> $GITHUB_OUTPUT
+            echo "target_container=backend-green" >> $GITHUB_OUTPUT
+          else
+            echo "current=green" >> $GITHUB_OUTPUT
+            echo "target=blue" >> $GITHUB_OUTPUT
+            echo "target_container=backend" >> $GITHUB_OUTPUT
+          fi
+          echo "Current: $(cat $GITHUB_OUTPUT | grep current | cut -d= -f2)"
+          echo "Target: $(cat $GITHUB_OUTPUT | grep target | cut -d= -f2)"
+
+      - name: Start new container (Green deployment)
+        run: |
+          cd ~/behindy-ops
+          # 환경변수 로드
+          set -a
+          source .env
+          set +a
+
+          # Green 컨테이너 시작
+          docker run -d \
+            --name ${{ steps.color.outputs.target_container }} \
+            --network behindy-ops_internal \
+            --restart always \
+            -e SPRING_DATASOURCE_URL="jdbc:postgresql://db:5432/${DB_NAME}" \
+            -e SPRING_DATASOURCE_USERNAME="${DB_USER}" \
+            -e SPRING_DATASOURCE_PASSWORD="${DB_PASS}" \
+            -e SPRING_DATA_REDIS_HOST=redis \
+            -e SPRING_DATA_REDIS_PORT=6379 \
+            -e SPRING_DATA_REDIS_PASSWORD="${REDIS_PASSWORD}" \
+            -e JWT_SECRET="${JWT_SECRET}" \
+            -e JWT_ACCESS_VALIDITY="${JWT_ACCESS_VALIDITY}" \
+            -e JWT_REFRESH_VALIDITY="${JWT_REFRESH_VALIDITY}" \
+            -e COOKIE_SECURE="${COOKIE_SECURE}" \
+            -e COOKIE_SAME_SITE="${COOKIE_SAME_SITE}" \
+            -e FIELD_KEY="${FIELD_KEY}" \
+            -e TABLE_KEY="${TABLE_KEY}" \
+            -e SEOUL_METRO_API_KEY="${SEOUL_METRO_API_KEY}" \
+            -e SEOUL_METRO_API_BASE_URL="http://swopenapi.seoul.go.kr/api/subway" \
+            -e SEOUL_METRO_API_ENABLED="${METRO_API_ENABLED}" \
+            -e SEOUL_METRO_API_TIMEOUT=10000 \
+            -e SEOUL_METRO_API_RETRY_COUNT=3 \
+            -e SEOUL_METRO_API_ENABLED_LINES="${METRO_ENABLED_LINES}" \
+            -e SEOUL_METRO_CACHE_TTL=300 \
+            -e SEOUL_METRO_API_UPDATE_INTERVAL=180000 \
+            -e SEOUL_METRO_MONITORING_DAILY_LIMIT="${METRO_DAILY_LIMIT}" \
+            -e AI_SERVER_URL=http://llmserver:8000 \
+            -e AI_SERVER_ENABLED="${AI_SERVER_ENABLED:-true}" \
+            -e AI_SERVER_TIMEOUT=900000 \
+            -e AI_SERVER_INTERNAL_API_KEY="${AI_SERVER_INTERNAL_API_KEY}" \
+            -e AI_STORY_GENERATION_ENABLED="${AI_STORY_GENERATION_ENABLED:-true}" \
+            -e AI_STORY_DAILY_LIMIT=10 \
+            -e AI_STORY_BATCH_SIZE="${AI_STORY_BATCH_SIZE:-1}" \
+            -e AI_STORY_TEST_INTERVAL="${AI_STORY_TEST_INTERVAL:-86400000}" \
+            -e AI_STORY_MIN_PER_STATION="${AI_STORY_MIN_PER_STATION:-2}" \
+            -e AI_STORY_AI_TIMEOUT=900000 \
+            -e TZ=Asia/Seoul \
+            -v /etc/localtime:/etc/localtime:ro \
+            -v /etc/timezone:/etc/timezone:ro \
+            ${{ secrets.DOCKER_USERNAME }}/behindy-backend:latest
+          echo "New container started: ${{ steps.color.outputs.target_container }}"
+
+      - name: Wait for service
+        run: |
+          echo "Waiting for ${{ steps.color.outputs.target_container }} to start..."
+          sleep 40
+
+      - name: Health check (internal)
+        run: |
+          echo "Running internal health check for ${{ steps.color.outputs.target_container }}..."
+          for i in {1..20}; do
+            if docker exec nginx curl -sf http://${{ steps.color.outputs.target_container }}:8080/actuator/health >/dev/null 2>&1; then
+              echo "✓ ${{ steps.color.outputs.target_container }} is responding internally"
+              break
+            fi
+            echo "Waiting for internal health... ($i/20)"
+            sleep 6
+          done
+
+      - name: Switch Nginx upstream
+        run: |
+          cd ~/behindy-ops
+          echo "Switching Nginx to route traffic to ${{ steps.color.outputs.target_container }}..."
+
+          if [ "${{ steps.color.outputs.target }}" = "green" ]; then
+            docker rename backend backend-blue 2>/dev/null || true
+            docker rename backend-green backend
+            echo "✓ Switched to Green deployment"
+          else
+            docker rename backend-green backend-blue 2>/dev/null || true
+            docker rename backend-blue backend 2>/dev/null || true
+            echo "✓ Switched to Blue deployment"
+          fi
+
+      - name: Health check (external)
+        run: |
+          echo "Running external health check via https://behindy.me..."
+          sleep 5
+          for i in {1..10}; do
+            if curl -s https://behindy.me/api/actuator/health >/dev/null 2>&1; then
+              echo "✓ Backend is responding externally"
+              break
+            fi
+            echo "Waiting for external health... ($i/10)"
+            sleep 3
+          done
+
+      - name: Stop old container
+        run: |
+          echo "Stopping old container..."
+          if [ "${{ steps.color.outputs.current }}" = "blue" ]; then
+            docker stop backend-blue 2>/dev/null || true
+            docker rm backend-blue 2>/dev/null || true
+            echo "✓ Old blue container stopped"
+          else
+            docker stop backend-green 2>/dev/null || true
+            docker rm backend-green 2>/dev/null || true
+            echo "✓ Old green container stopped"
+          fi
+
+      - name: Cleanup old images
+        run: |
+          echo "Cleaning up old backend images..."
+          # 현재 프로젝트의 이미지만 필터링하여 최신 2개 제외하고 삭제
+          docker images ${{ secrets.DOCKER_USERNAME }}/behindy-backend --format "{{.ID}} {{.CreatedAt}}" | \
+            sort -rk 2 | \
+            awk 'NR>2 {print $1}' | \
+            xargs -r docker rmi -f || true
+          # dangling 이미지 정리
+          docker image prune -f
+          echo "Old images cleaned up"
+
+      - name: Display status
+        run: |
+          echo "=== Deployment Summary ==="
+          docker ps --filter "name=backend" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+          echo ""
+          echo "Backend deployed successfully!"
