@@ -148,13 +148,26 @@ jobs:
           cd ~/behindy-ops
           echo "Switching Nginx to route traffic to ${{ steps.color.outputs.target_container }}..."
 
+          cleanup_container() {
+            local name="$1"
+            if docker ps -a --format '{{.Names}}' | grep -Fxq "$name"; then
+              docker rm -f "$name"
+            fi
+          }
+
           if [ "${{ steps.color.outputs.target }}" = "green" ]; then
-            docker rename backend backend-blue 2>/dev/null || true
+            cleanup_container backend-blue
+            if docker ps -a --format '{{.Names}}' | grep -Fxq backend; then
+              docker rename backend backend-blue
+            fi
             docker rename backend-green backend
             echo "✓ Switched to Green deployment"
           else
-            docker rename backend-green backend-blue 2>/dev/null || true
-            docker rename backend-blue backend 2>/dev/null || true
+            cleanup_container backend-green
+            if docker ps -a --format '{{.Names}}' | grep -Fxq backend; then
+              docker rename backend backend-green
+            fi
+            docker rename backend-blue backend
             echo "✓ Switched to Blue deployment"
           fi
 
