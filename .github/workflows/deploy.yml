@@ -167,11 +167,12 @@ jobs:
             echo "✓ Switched to Green deployment"
           else
             cleanup_container backend-green
-            if docker ps -a --format '{{.Names}}' | grep -Fxq backend; then
-              docker rename backend backend-green
+            if docker ps -a --format '{{.Names}}' | grep -Fxq backend-blue; then
+              docker rename backend-blue backend
+              echo "✓ Switched to Blue deployment (reuse backend-blue)"
+            else
+              echo "✓ No backend-blue container to promote; ${{ steps.color.outputs.target_container }} already serves traffic"
             fi
-            docker rename backend-blue backend
-            echo "✓ Switched to Blue deployment"
           fi
 
       - name: Reload nginx and verify routing
