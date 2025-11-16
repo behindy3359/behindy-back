@@ -12,22 +12,22 @@ import java.util.Optional;
 @Repository
 public interface VoteBallotRepository extends JpaRepository<VoteBallot, Long> {
 
-    @Query("SELECT b FROM VoteBallot b WHERE b.vote.voteId = :voteId AND b.user.userId = :userId")
+    @Query("SELECT b FROM VoteBallot b WHERE b.roomVote.voteId = :voteId AND b.user.userId = :userId")
     Optional<VoteBallot> findByVoteIdAndUserId(@Param("voteId") Long voteId, @Param("userId") Long userId);
 
     @Query("SELECT CASE WHEN COUNT(b) > 0 THEN true ELSE false END " +
-           "FROM VoteBallot b WHERE b.vote.voteId = :voteId AND b.user.userId = :userId")
+           "FROM VoteBallot b WHERE b.roomVote.voteId = :voteId AND b.user.userId = :userId")
     boolean existsByVoteIdAndUserId(@Param("voteId") Long voteId, @Param("userId") Long userId);
 
-    @Query("SELECT b FROM VoteBallot b WHERE b.vote.voteId = :voteId")
+    @Query("SELECT b FROM VoteBallot b WHERE b.roomVote.voteId = :voteId")
     List<VoteBallot> findByVoteId(@Param("voteId") Long voteId);
 
-    @Query("SELECT COUNT(b) FROM VoteBallot b WHERE b.vote.voteId = :voteId AND b.vote = true")
+    @Query("SELECT COUNT(b) FROM VoteBallot b WHERE b.roomVote.voteId = :voteId AND b.vote = true")
     long countYesVotes(@Param("voteId") Long voteId);
 
-    @Query("SELECT COUNT(b) FROM VoteBallot b WHERE b.vote.voteId = :voteId AND b.vote = false")
+    @Query("SELECT COUNT(b) FROM VoteBallot b WHERE b.roomVote.voteId = :voteId AND b.vote = false")
     long countNoVotes(@Param("voteId") Long voteId);
 
-    @Query("SELECT COUNT(b) FROM VoteBallot b WHERE b.vote.voteId = :voteId")
+    @Query("SELECT COUNT(b) FROM VoteBallot b WHERE b.roomVote.voteId = :voteId")
     long countByVoteId(@Param("voteId") Long voteId);
 }
