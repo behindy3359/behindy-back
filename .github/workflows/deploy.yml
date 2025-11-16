@@ -177,7 +177,15 @@ jobs:
       - name: Reload nginx and verify routing
         run: |
           cd ~/behindy-ops
-          ./scripts/reconnect-nginx.sh backend
+          for i in {1..5}; do
+            if ./scripts/reconnect-nginx.sh backend; then
+              exit 0
+            fi
+            echo "Retrying nginx reconnect ($i/5)..."
+            sleep 10
+          done
+          echo "Failed to reconnect nginx after multiple attempts"
+          exit 1
 
       - name: Health check (external)
         run: |
