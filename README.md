@@ -1,14 +1,21 @@
-# Behindy Backend - 2025.11.09
+# Behindy Backend
 
-지하철 역 기반 텍스트 어드벤처 게임의 백엔드 서버입니다.
+서울 지하철 역을 배경으로 한 텍스트 어드벤처 게임의 백엔드 API 서버입니다. JWT 기반 인증, 게임 로직, AI 스토리 생성 연동, 커뮤니티 기능, 실시간 WebSocket 통신을 제공합니다.
 
 ## 기술 스택
 
 - **Framework**: Spring Boot 3.4.5
 - **Language**: Java 21
+- **Build Tool**: Gradle 8.x
 - **Database**: PostgreSQL 15
 - **Cache**: Redis 7
-- **Test**: JUnit 5, Mockito
+- **Security**: Spring Security 6 + JWT (jjwt 0.11.5)
+- **WebSocket**: Spring WebSocket + STOMP
+- **HTTP Client**: WebFlux WebClient
+- **API Documentation**: SpringDoc OpenAPI 2.7
+- **ORM**: Spring Data JPA + Hibernate
+- **Utilities**: Lombok 1.18, Jsoup 1.15 (XSS 방지)
+- **Test**: JUnit 5, Mockito, Spring Security Test
 
 ## 주요 기능
 
@@ -19,23 +26,35 @@
 - HttpOnly Cookie
 
 ### 게임 (Game)
-- 지하철 역 기반 스토리 시작
-- 캐릭터 생성 및 관리
-- 선택지에 따른 스토리 분기
-- 체력/정신력 스탯 시스템
+- 지하철 역 및 호선 기반 게임 시작
+- 캐릭터 생성 및 관리 (이름, HP, Sanity)
+- 선택지에 따른 스토리 분기 처리
+- 게임 상태 추적 및 히스토리 관리
+- 멀티플레이어 룸 생성 및 참여
+- WebSocket 기반 실시간 채팅 및 상태 동기화
 
 ### 커뮤니티 (Community)
-- 게시글 CRUD
-- 댓글 시스템
-- HTML Sanitization
+- 게시글 CRUD (작성, 조회, 수정, 삭제)
+- 댓글 작성 및 좋아요
+- HTML Sanitization (XSS 방지)
+- 조회수 및 통계 관리
 
-### AI 통합
-- LLM Server와 연동
-- 스토리 자동 생성
+### AI 스토리 생성
+- LLM Server (FastAPI)와 WebClient 연동
+- 역 정보 기반 스토리 자동 생성
 - 배치 작업 스케줄링
+- Mock Provider 지원 (개발 환경)
 
-### 외부 API
-- 서울 지하철 실시간 정보 연동
+### 지하철 실시간 정보
+- 서울 열린데이터광장 API 연동
+- 실시간 열차 위치 정보 조회
+- Redis 기반 캐싱 (API 호출 최소화)
+- 정기 데이터 갱신 스케줄러
+
+### 보안 및 암호화
+- AES256 필드 레벨 암호화
+- 테이블 레벨 암호화
+- Internal API Key 인증 (서비스 간 통신)
 
 ## API 엔드포인트
 
@@ -164,14 +183,21 @@ src/
 ## 데이터베이스 스키마
 
 ### 주요 테이블
-- `users`: 사용자 정보
-- `char`: 게임 캐릭터
+- `users`: 사용자 정보 (암호화된 이메일, BCrypt 해싱된 비밀번호)
+- `refresh_token`: JWT Refresh Token 관리
+- `char`: 게임 캐릭터 (이름, HP, Sanity)
 - `sto`: 스토리 메타데이터
-- `page`: 스토리 페이지
-- `options`: 선택지
-- `now`: 게임 진행 상태
-- `post`: 게시글
+- `page`: 스토리 페이지 내용
+- `options`: 페이지별 선택지
+- `now`: 현재 게임 진행 상태
+- `post`: 커뮤니티 게시글
+- `post_stats`: 게시글 통계 (조회수, 좋아요 등)
 - `comment`: 댓글
+- `comment_like`: 댓글 좋아요
+- `station`: 지하철 역 정보
+- `stations_tr`: 역 번역 정보
+- `log_e`, `log_o`: 에러 및 운영 로그
+- `ops_log_a`, `ops_log_b`, `ops_log_d`, `ops_log_x`: 운영 로그 (타입별)
 
 ## 보안
 
@@ -182,13 +208,21 @@ src/
 - XSS 방지 (HTML Sanitization)
 - CORS 설정
 
+## 아키텍처
+
+이 프로젝트는 멀티레포지토리 아키텍처를 사용합니다.
+
+- Frontend: Next.js 기반 UI 레이어
+- Backend (이 레포): Spring Boot 기반 비즈니스 로직 및 API
+- Story (LLM Server): FastAPI 기반 AI 스토리 생성 서버
+- Ops: Docker Compose 기반 인프라 관리
+
 ## 관련 레포지토리
 
-- [behindy-frontend](https://github.com/behindy3359/behindy-frontend) - Next.js 프론트엔드
-- [behindy-llmserver](https://github.com/behindy3359/behindy-llmserver) - FastAPI AI 서버
-- [behindy-ops](https://github.com/behindy3359/behindy-ops) - 인프라 설정
+- [behindy-front](https://github.com/behindy3359/behindy-front) - Next.js 프론트엔드
+- [behindy-story](https://github.com/behindy3359/behindy-story) - FastAPI AI 스토리 생성 서버
+- [behindy-ops](https://github.com/behindy3359/behindy-ops) - 인프라 관리 (PostgreSQL, Redis, Nginx)
 
 ## 라이선스
 
 MIT License
-# CI/CD Test
