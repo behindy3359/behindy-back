@@ -80,10 +80,11 @@ public class SecurityConfig {
 
     @Bean
     public CookieCsrfTokenRepository cookieCsrfTokenRepository() {
-        CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        CookieCsrfTokenRepository repository = new CookieCsrfTokenRepository();
         repository.setCookieName("XSRF-TOKEN");
         repository.setHeaderName("X-XSRF-TOKEN");
         repository.setCookiePath("/");
+        repository.setCookieHttpOnly(true);
         return repository;
     }
 
@@ -149,6 +150,7 @@ public class SecurityConfig {
 
                         // 내부 API
                         .requestMatchers("/api/ai-stories/internal/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/security/csrf-token").permitAll()
 
                         .requestMatchers(HttpMethod.GET, "/api/ai-stories/health").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
