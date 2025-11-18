@@ -29,13 +29,7 @@ public class InternalApiKeyFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
 
         String requestURI = request.getRequestURI();
-        log.info("[InternalApiKeyFilter] Request: {}", requestURI);
-
-        if (!requestURI.startsWith(INTERNAL_API_PATH)) {
-            log.info("[InternalApiKeyFilter] Not internal API path - pass: {}", requestURI);
-            filterChain.doFilter(request, response);
-            return;
-        }
+        log.info("[InternalApiKeyFilter] Internal API request: {}", requestURI);
 
         String providedApiKey = request.getHeader(API_KEY_HEADER);
 
@@ -52,6 +46,12 @@ public class InternalApiKeyFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String requestURI = request.getRequestURI();
+        return requestURI == null || !requestURI.startsWith(INTERNAL_API_PATH);
     }
 
     private String getClientIP(HttpServletRequest request) {
