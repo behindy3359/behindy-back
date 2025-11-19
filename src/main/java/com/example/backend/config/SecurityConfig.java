@@ -1,5 +1,6 @@
 package com.example.backend.config;
 
+import com.example.backend.security.filter.CsrfDebugLoggingFilter;
 import com.example.backend.security.filter.InternalApiKeyFilter;
 import com.example.backend.security.jwt.JwtAuthenticationEntryPoint;
 import com.example.backend.security.jwt.JwtAuthenticationFilter;
@@ -19,6 +20,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.web.cors.CorsConfiguration;
@@ -36,6 +38,7 @@ public class SecurityConfig {
     private final JwtAuthenticationEntryPoint unauthorizedHandler;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final InternalApiKeyFilter internalApiKeyFilter;
+    private final CsrfDebugLoggingFilter csrfDebugLoggingFilter;
 
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
@@ -170,6 +173,7 @@ public class SecurityConfig {
 
         http.authenticationProvider(authenticationProvider());
 
+        http.addFilterBefore(csrfDebugLoggingFilter, CsrfFilter.class);
         http.addFilterBefore(internalApiKeyFilter, UsernamePasswordAuthenticationFilter.class);
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

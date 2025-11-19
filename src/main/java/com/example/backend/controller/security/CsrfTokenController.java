@@ -12,6 +12,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @RestController
 @RequestMapping("/api/security")
 @RequiredArgsConstructor
@@ -28,6 +31,7 @@ public class CsrfTokenController {
             csrfTokenRepository.saveToken(csrfToken, request, response);
         }
 
+        log.info("[CSRF] Token issued for {} {}", request.getMethod(), request.getRequestURI());
         return ResponseEntity.ok(Map.of(
                 "token", csrfToken.getToken()
         ));
