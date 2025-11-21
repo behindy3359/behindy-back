@@ -48,7 +48,7 @@ crypto:
   table-secret-key: ${TABLE_KEY:default_table_key_32_characters_long}
 
 jwt:
-  secret: ${JWT_SECRET:default_jwt_secret_key}
+  secret: ${JWT_SECRET:default_jwt_secret_key_for_local_development_must_be_at_least_256_bits}
   access-validity: ${JWT_ACCESS_VALIDITY:900000}
   refresh-validity: ${JWT_REFRESH_VALIDITY:604800000}
 
