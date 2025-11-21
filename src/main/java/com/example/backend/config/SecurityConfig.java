@@ -87,7 +87,7 @@ public class SecurityConfig {
         repository.setCookieName("XSRF-TOKEN");
         repository.setHeaderName("X-XSRF-TOKEN");
         repository.setCookiePath("/");
-        repository.setCookieHttpOnly(true);
+        repository.setCookieHttpOnly(false);  // JavaScript에서 읽을 수 있도록 false로 설정
         return repository;
     }
 
