@@ -83,11 +83,13 @@ public class SecurityConfig {
 
     @Bean
     public CookieCsrfTokenRepository cookieCsrfTokenRepository() {
-        CookieCsrfTokenRepository repository = new CookieCsrfTokenRepository();
+        CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         repository.setCookieName("XSRF-TOKEN");
         repository.setHeaderName("X-XSRF-TOKEN");
         repository.setCookiePath("/");
+        repository.setCookieSecure(true);
         repository.setCookieHttpOnly(false);  // JavaScript에서 읽을 수 있도록 false로 설정
+        repository.setCookieMaxAge((int) java.time.Duration.ofHours(1).toSeconds());
         return repository;
     }
 
