@@ -2,6 +2,7 @@ package com.example.backend.service.multiplayer;
 
 import com.example.backend.dto.multiplayer.*;
 import com.example.backend.entity.*;
+import com.example.backend.entity.Station;
 import com.example.backend.entity.multiplayer.*;
 import com.example.backend.exception.ResourceNotFoundException;
 import com.example.backend.repository.*;
@@ -12,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -33,8 +35,7 @@ public class MultiplayerRoomService {
     public RoomResponse createRoom(RoomCreateRequest request) {
         User currentUser = authService.getCurrentUser();
 
-        Station station = stationRepository.findById(request.getStationId())
-                .orElseThrow(() -> new ResourceNotFoundException("역을 찾을 수 없습니다"));
+        Station station = resolveStation(request.getStationId(), request.getStationName(), request.getLineNumber());
 
         com.example.backend.entity.Character character = characterRepository.findById(request.getCharacterId())
                 .orElseThrow(() -> new ResourceNotFoundException("캐릭터를 찾을 수 없습니다"));
@@ -183,14 +184,29 @@ public class MultiplayerRoomService {
     }
 
     @Transactional(readOnly = true)
-    public List<RoomResponse> getRoomsByStation(Long stationId) {
+    public List<RoomResponse> getRoomsByStation(Long stationId, String stationName, Integer lineNumber) {
+        Station station = resolveStation(stationId, stationName, lineNumber);
         List<RoomStatus> activeStatuses = List.of(RoomStatus.WAITING, RoomStatus.PLAYING);
         List<MultiplayerRoom> rooms = roomRepository
-                .findByStationIdAndStatusIn(stationId, activeStatuses);
+                .findByStationIdAndStatusIn(station.getStaId(), activeStatuses);
 
         return rooms.stream()
                 .map(this::toRoomResponse)
                 .collect(Collectors.toList());
+    }
+
+    private Station resolveStation(Long stationId, String stationName, Integer lineNumber) {
+        if (stationId != null) {
+            return stationRepository.findById(stationId)
+                    .orElseThrow(() -> new ResourceNotFoundException("역을 찾을 수 없습니다"));
+        }
+
+        if (StringUtils.hasText(stationName) && lineNumber != null) {
+            return stationRepository.findByStaNameAndStaLine(stationName, lineNumber)
+                    .orElseThrow(() -> new ResourceNotFoundException("역을 찾을 수 없습니다"));
+        }
+
+        throw new IllegalArgumentException("역 정보가 필요합니다");
     }
 
     @Transactional(readOnly = true)

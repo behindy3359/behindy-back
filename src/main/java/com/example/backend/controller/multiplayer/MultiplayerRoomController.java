@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 
@@ -53,8 +54,14 @@ public class MultiplayerRoomController {
 
     @Operation(summary = "역별 방 목록 조회", description = "특정 역의 활성 방 목록을 조회합니다")
     @GetMapping
-    public ResponseEntity<List<RoomResponse>> getRoomsByStation(@RequestParam Long stationId) {
-        List<RoomResponse> rooms = roomService.getRoomsByStation(stationId);
+    public ResponseEntity<List<RoomResponse>> getRoomsByStation(
+            @RequestParam(required = false) Long stationId,
+            @RequestParam(required = false) String stationName,
+            @RequestParam(required = false) Integer lineNumber) {
+        if (stationId == null && (!StringUtils.hasText(stationName) || lineNumber == null)) {
+            return ResponseEntity.badRequest().build();
+        }
+        List<RoomResponse> rooms = roomService.getRoomsByStation(stationId, stationName, lineNumber);
         return ResponseEntity.ok(rooms);
     }
 
