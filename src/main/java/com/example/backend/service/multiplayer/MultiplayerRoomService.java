@@ -268,8 +268,8 @@ public class MultiplayerRoomService {
             try {
                 return statsRepository.findByUserIdForUpdate(user.getUserId())
                         .orElseGet(() -> {
+                            // @MapsId 사용 시 user만 설정, userId는 자동 할당
                             UserStoryStats newStats = UserStoryStats.builder()
-                                    .userId(user.getUserId())
                                     .user(user)
                                     .build();
                             return statsRepository.save(newStats);
