@@ -95,18 +95,15 @@ public class SecurityConfig {
     }
 
     @Bean
-    public CsrfTokenRepository safeCsrfTokenRepository(CookieCsrfTokenRepository cookieCsrfTokenRepository) {
-        return new SafeCookieCsrfTokenRepository(cookieCsrfTokenRepository);
-    }
-
-    @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http,
+                                           CookieCsrfTokenRepository cookieCsrfTokenRepository) throws Exception {
         CsrfTokenRequestAttributeHandler requestHandler = new CsrfTokenRequestAttributeHandler();
         requestHandler.setCsrfRequestAttributeName("_csrf");
+        CsrfTokenRepository safeRepository = new SafeCookieCsrfTokenRepository(cookieCsrfTokenRepository);
 
         http
                 .csrf(csrf -> csrf
-                        .csrfTokenRepository(safeCsrfTokenRepository(cookieCsrfTokenRepository()))
+                        .csrfTokenRepository(safeRepository)
                         .csrfTokenRequestHandler(requestHandler)
                         .ignoringRequestMatchers(
                                 // 공개 API - CSRF 검증 제외
