@@ -198,7 +198,13 @@ public class MultiplayerRoomService {
     private Station resolveStation(Long stationId, String stationName, Integer lineNumber) {
         if (stationId != null) {
             return stationRepository.findById(stationId)
-                    .orElseThrow(() -> new ResourceNotFoundException("역을 찾을 수 없습니다"));
+                    .orElseGet(() -> {
+                        if (StringUtils.hasText(stationName) && lineNumber != null) {
+                            return stationRepository.findByStaNameAndStaLine(stationName, lineNumber)
+                                    .orElseThrow(() -> new ResourceNotFoundException("역을 찾을 수 없습니다"));
+                        }
+                        throw new ResourceNotFoundException("역을 찾을 수 없습니다");
+                    });
         }
 
         if (StringUtils.hasText(stationName) && lineNumber != null) {
