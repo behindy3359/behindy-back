@@ -76,11 +76,16 @@ public class MultiplayerRoomService {
 
         participantRepository.save(participant);
 
-        UserStoryStats stats = statsRepository.findByUserId(currentUser.getUserId())
-                .orElse(UserStoryStats.builder()
-                        .userId(currentUser.getUserId())
-                        .user(currentUser)
-                        .build());
+        // Pessimistic Lock으로 동시성 충돌 방지
+        UserStoryStats stats = statsRepository.findByUserIdForUpdate(currentUser.getUserId())
+                .orElseGet(() -> {
+                    // 새 통계 생성 (트랜잭션 내에서 즉시 저장)
+                    UserStoryStats newStats = UserStoryStats.builder()
+                            .userId(currentUser.getUserId())
+                            .user(currentUser)
+                            .build();
+                    return statsRepository.save(newStats);
+                });
         stats.incrementParticipations();
         statsRepository.save(stats);
 
@@ -138,11 +143,16 @@ public class MultiplayerRoomService {
 
         participantRepository.save(participant);
 
-        UserStoryStats stats = statsRepository.findByUserId(currentUser.getUserId())
-                .orElse(UserStoryStats.builder()
-                        .userId(currentUser.getUserId())
-                        .user(currentUser)
-                        .build());
+        // Pessimistic Lock으로 동시성 충돌 방지
+        UserStoryStats stats = statsRepository.findByUserIdForUpdate(currentUser.getUserId())
+                .orElseGet(() -> {
+                    // 새 통계 생성 (트랜잭션 내에서 즉시 저장)
+                    UserStoryStats newStats = UserStoryStats.builder()
+                            .userId(currentUser.getUserId())
+                            .user(currentUser)
+                            .build();
+                    return statsRepository.save(newStats);
+                });
         stats.incrementParticipations();
         statsRepository.save(stats);
 
