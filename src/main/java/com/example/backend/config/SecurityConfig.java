@@ -121,6 +121,8 @@ public class SecurityConfig {
                                 "/webjars/**",
                                 // 내부 API
                                 "/api/ai-stories/internal/**",
+                                // WebSocket - CSRF 검증 제외
+                                "/ws/**",
                                 // 조회 API - GET 요청은 일반적으로 CSRF 대상이 아님
                                 "/api/posts",
                                 "/api/posts/**",
@@ -149,6 +151,9 @@ public class SecurityConfig {
                         .requestMatchers("/test/**").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/").permitAll()
+
+                        // WebSocket 엔드포인트
+                        .requestMatchers("/ws/**").permitAll()
 
                         // 조회 API
                         .requestMatchers(HttpMethod.GET, "/api/posts").permitAll()
