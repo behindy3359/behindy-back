@@ -22,6 +22,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CsrfFilter;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.web.cors.CorsConfiguration;
@@ -83,8 +84,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SafeCookieCsrfTokenRepository cookieCsrfTokenRepository() {
-        SafeCookieCsrfTokenRepository repository = new SafeCookieCsrfTokenRepository();
+    public CookieCsrfTokenRepository cookieCsrfTokenRepository() {
+        CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         repository.setCookieName("XSRF-TOKEN");
         repository.setHeaderName("X-XSRF-TOKEN");
         repository.setCookiePath("/");
@@ -94,13 +95,18 @@ public class SecurityConfig {
     }
 
     @Bean
+    public CsrfTokenRepository safeCsrfTokenRepository(CookieCsrfTokenRepository cookieCsrfTokenRepository) {
+        return new SafeCookieCsrfTokenRepository(cookieCsrfTokenRepository);
+    }
+
+    @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         CsrfTokenRequestAttributeHandler requestHandler = new CsrfTokenRequestAttributeHandler();
         requestHandler.setCsrfRequestAttributeName("_csrf");
 
         http
                 .csrf(csrf -> csrf
-                        .csrfTokenRepository(cookieCsrfTokenRepository())
+                        .csrfTokenRepository(safeCsrfTokenRepository(cookieCsrfTokenRepository()))
                         .csrfTokenRequestHandler(requestHandler)
                         .ignoringRequestMatchers(
                                 // 공개 API - CSRF 검증 제외
