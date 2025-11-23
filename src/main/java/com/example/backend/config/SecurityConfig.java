@@ -1,5 +1,6 @@
 package com.example.backend.config;
 
+import com.example.backend.security.csrf.SafeCookieCsrfTokenRepository;
 import com.example.backend.security.filter.CsrfDebugLoggingFilter;
 import com.example.backend.security.filter.InternalApiKeyFilter;
 import com.example.backend.security.jwt.JwtAuthenticationEntryPoint;
@@ -82,8 +83,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public CookieCsrfTokenRepository cookieCsrfTokenRepository() {
-        CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+    public SafeCookieCsrfTokenRepository cookieCsrfTokenRepository() {
+        SafeCookieCsrfTokenRepository repository = new SafeCookieCsrfTokenRepository();
         repository.setCookieName("XSRF-TOKEN");
         repository.setHeaderName("X-XSRF-TOKEN");
         repository.setCookiePath("/");
