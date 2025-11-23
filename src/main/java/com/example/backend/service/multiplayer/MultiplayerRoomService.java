@@ -77,15 +77,7 @@ public class MultiplayerRoomService {
         participantRepository.save(participant);
 
         // Pessimistic Lock으로 동시성 충돌 방지
-        UserStoryStats stats = statsRepository.findByUserIdForUpdate(currentUser.getUserId())
-                .orElseGet(() -> {
-                    // 새 통계 생성 (트랜잭션 내에서 즉시 저장)
-                    UserStoryStats newStats = UserStoryStats.builder()
-                            .userId(currentUser.getUserId())
-                            .user(currentUser)
-                            .build();
-                    return statsRepository.save(newStats);
-                });
+        UserStoryStats stats = getOrCreateUserStats(currentUser);
         stats.incrementParticipations();
         statsRepository.save(stats);
 
@@ -144,15 +136,7 @@ public class MultiplayerRoomService {
         participantRepository.save(participant);
 
         // Pessimistic Lock으로 동시성 충돌 방지
-        UserStoryStats stats = statsRepository.findByUserIdForUpdate(currentUser.getUserId())
-                .orElseGet(() -> {
-                    // 새 통계 생성 (트랜잭션 내에서 즉시 저장)
-                    UserStoryStats newStats = UserStoryStats.builder()
-                            .userId(currentUser.getUserId())
-                            .user(currentUser)
-                            .build();
-                    return statsRepository.save(newStats);
-                });
+        UserStoryStats stats = getOrCreateUserStats(currentUser);
         stats.incrementParticipations();
         statsRepository.save(stats);
 
@@ -270,5 +254,44 @@ public class MultiplayerRoomService {
                 .participants(participantResponses)
                 .createdAt(room.getCreatedAt())
                 .build();
+    }
+
+    /**
+     * UserStoryStats를 조회하거나 생성합니다.
+     * 동시성 충돌 시 재시도합니다 (최대 3회).
+     */
+    private UserStoryStats getOrCreateUserStats(User user) {
+        int maxRetries = 3;
+        int attempt = 0;
+
+        while (attempt < maxRetries) {
+            try {
+                return statsRepository.findByUserIdForUpdate(user.getUserId())
+                        .orElseGet(() -> {
+                            UserStoryStats newStats = UserStoryStats.builder()
+                                    .userId(user.getUserId())
+                                    .user(user)
+                                    .build();
+                            return statsRepository.save(newStats);
+                        });
+            } catch (org.springframework.orm.ObjectOptimisticLockingFailureException |
+                     org.springframework.dao.DataIntegrityViolationException e) {
+                attempt++;
+                if (attempt >= maxRetries) {
+                    log.error("Failed to get or create UserStoryStats after {} attempts for user {}",
+                            maxRetries, user.getUserId(), e);
+                    throw e;
+                }
+                log.warn("Concurrent modification detected for UserStoryStats (user: {}), retrying... (attempt {}/{})",
+                        user.getUserId(), attempt, maxRetries);
+                try {
+                    Thread.sleep(50 * attempt); // Exponential backoff: 50ms, 100ms, 150ms
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Thread interrupted during retry", ie);
+                }
+            }
+        }
+        throw new IllegalStateException("Unreachable code");
     }
 }
