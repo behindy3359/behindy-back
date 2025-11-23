@@ -3,40 +3,21 @@ package com.example.backend.security.csrf;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.web.csrf.CsrfToken;
-import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.util.StringUtils;
 
 /**
- * Wrapper around {@link CookieCsrfTokenRepository} that avoids deleting the CSRF cookie
- * when Spring Security tries to save a {@code null} token for safe (e.g. GET) requests.
- * This prevents accidental cookie deletion when a GET request happens to include a stale header.
+ * CookieCsrfTokenRepository that keeps the issued XSRF cookie when Spring Security attempts
+ * to clear the token for safe (GET/HEAD/OPTIONS/TRACE) requests.
  */
-public class SafeCookieCsrfTokenRepository implements CsrfTokenRepository {
-
-    private final CookieCsrfTokenRepository delegate;
-
-    public SafeCookieCsrfTokenRepository() {
-        this.delegate = CookieCsrfTokenRepository.withHttpOnlyFalse();
-    }
-
-    @Override
-    public CsrfToken generateToken(HttpServletRequest request) {
-        return delegate.generateToken(request);
-    }
+public class SafeCookieCsrfTokenRepository extends CookieCsrfTokenRepository {
 
     @Override
     public void saveToken(CsrfToken token, HttpServletRequest request, HttpServletResponse response) {
         if (token == null && isSafeMethod(request)) {
-            // Don't clear cookie on GET/HEAD/etc. to keep issued token alive
             return;
         }
-        delegate.saveToken(token, request, response);
-    }
-
-    @Override
-    public CsrfToken loadToken(HttpServletRequest request) {
-        return delegate.loadToken(request);
+        super.saveToken(token, request, response);
     }
 
     private boolean isSafeMethod(HttpServletRequest request) {
@@ -48,25 +29,5 @@ public class SafeCookieCsrfTokenRepository implements CsrfTokenRepository {
             case "GET", "HEAD", "OPTIONS", "TRACE" -> true;
             default -> false;
         };
-    }
-
-    public void setCookieName(String cookieName) {
-        delegate.setCookieName(cookieName);
-    }
-
-    public void setHeaderName(String headerName) {
-        delegate.setHeaderName(headerName);
-    }
-
-    public void setCookiePath(String path) {
-        delegate.setCookiePath(path);
-    }
-
-    public void setCookieHttpOnly(boolean httpOnly) {
-        delegate.setCookieHttpOnly(httpOnly);
-    }
-
-    public void setCookieMaxAge(int cookieMaxAge) {
-        delegate.setCookieMaxAge(cookieMaxAge);
     }
 }
