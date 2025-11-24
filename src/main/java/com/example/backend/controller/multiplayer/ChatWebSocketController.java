@@ -2,9 +2,11 @@ package com.example.backend.controller.multiplayer;
 
 import com.example.backend.dto.multiplayer.ChatMessageRequest;
 import com.example.backend.dto.multiplayer.ChatMessageResponse;
+import com.example.backend.dto.multiplayer.RoomVoteResponse;
 import com.example.backend.service.multiplayer.ChatMessageService;
 import com.example.backend.service.multiplayer.LlmIntegrationService;
 import com.example.backend.service.multiplayer.VoteService;
+import com.example.backend.repository.multiplayer.RoomParticipantRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
@@ -14,6 +16,7 @@ import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -25,6 +28,7 @@ public class ChatWebSocketController {
     private final LlmIntegrationService llmIntegrationService;
     private final VoteService voteService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final RoomParticipantRepository participantRepository;
 
     @MessageMapping("/room/{roomId}/chat")
     public void handleChat(
@@ -101,6 +105,14 @@ public class ChatWebSocketController {
             );
 
             messagingTemplate.convertAndSend("/topic/room/" + roomId, voteMessage);
+
+            RoomVoteResponse voteState = voteService.getVoteState(voteId);
+            ChatMessageResponse voteStateMessage = chatMessageService.sendVoteMessage(
+                    roomId,
+                    voteState,
+                    "vote_state"
+            );
+            messagingTemplate.convertAndSend("/topic/room/" + roomId, voteStateMessage);
         } catch (Exception e) {
             log.error("Error starting kick vote in room {}: {}", roomId, e.getMessage());
             sendErrorToUser(headerAccessor, e.getMessage());
@@ -122,6 +134,14 @@ public class ChatWebSocketController {
 
             VoteService.VoteResult result = voteService.submitBallot(voteId, vote);
 
+            RoomVoteResponse voteState = voteService.getVoteState(voteId);
+            ChatMessageResponse voteStateMessage = chatMessageService.sendVoteMessage(
+                    roomId,
+                    voteState,
+                    "vote_state"
+            );
+            messagingTemplate.convertAndSend("/topic/room/" + roomId, voteStateMessage);
+
             if (result.getStatus() != com.example.backend.entity.multiplayer.VoteStatus.PENDING) {
                 String messageContent = result.getStatus() ==
                     com.example.backend.entity.multiplayer.VoteStatus.PASSED ?
@@ -141,6 +161,34 @@ public class ChatWebSocketController {
             }
         } catch (Exception e) {
             log.error("Error submitting ballot in room {}: {}", roomId, e.getMessage());
+            sendErrorToUser(headerAccessor, e.getMessage());
+        }
+    }
+
+    @MessageMapping("/room/{roomId}/sync")
+    public void syncMessages(
+            @DestinationVariable Long roomId,
+            @Payload Map<String, Long> payload,
+            SimpMessageHeaderAccessor headerAccessor) {
+
+        try {
+            Long userId = getUserIdFromSession(headerAccessor);
+            boolean isParticipant = participantRepository.existsByRoomIdAndUserId(roomId, userId);
+
+            if (!isParticipant) {
+                throw new IllegalStateException("방 참가자만 메시지 동기화를 요청할 수 있습니다");
+            }
+
+            Long lastMessageId = payload.get("lastMessageId");
+            List<ChatMessageResponse> missed = chatMessageService.getMessagesAfter(roomId, lastMessageId, 100);
+
+            messagingTemplate.convertAndSendToUser(
+                    userId.toString(),
+                    "/queue/sync",
+                    missed
+            );
+        } catch (Exception e) {
+            log.error("Error syncing messages in room {}: {}", roomId, e.getMessage());
             sendErrorToUser(headerAccessor, e.getMessage());
         }
     }

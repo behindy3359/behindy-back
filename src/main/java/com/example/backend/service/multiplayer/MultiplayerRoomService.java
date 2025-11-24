@@ -30,6 +30,8 @@ public class MultiplayerRoomService {
     private final CharacterRepository characterRepository;
     private final UserStoryStatsRepository statsRepository;
     private final AuthService authService;
+    private final ChatMessageService chatMessageService;
+    private final VoteService voteService;
 
     @Transactional
     public RoomResponse createRoom(RoomCreateRequest request) {
@@ -210,11 +212,19 @@ public class MultiplayerRoomService {
     }
 
     @Transactional(readOnly = true)
-    public RoomResponse getRoomDetail(Long roomId) {
+    public RoomDetailResponse getRoomDetail(Long roomId) {
         MultiplayerRoom room = roomRepository.findByIdWithParticipants(roomId)
                 .orElseThrow(() -> new ResourceNotFoundException("방을 찾을 수 없습니다"));
 
-        return toRoomResponse(room);
+        RoomResponse roomResponse = toRoomResponse(room);
+        List<ChatMessageResponse> messages = chatMessageService.getMessages(roomId, 50);
+        RoomVoteResponse activeVote = voteService.getActiveVote(roomId);
+
+        return RoomDetailResponse.builder()
+                .room(roomResponse)
+                .messages(messages)
+                .activeVote(activeVote)
+                .build();
     }
 
     private RoomResponse toRoomResponse(MultiplayerRoom room) {

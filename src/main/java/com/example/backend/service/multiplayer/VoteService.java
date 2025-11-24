@@ -3,6 +3,7 @@ package com.example.backend.service.multiplayer;
 import com.example.backend.entity.User;
 import com.example.backend.entity.multiplayer.*;
 import com.example.backend.exception.ResourceNotFoundException;
+import com.example.backend.dto.multiplayer.RoomVoteResponse;
 import com.example.backend.repository.multiplayer.*;
 import com.example.backend.service.AuthService;
 import lombok.RequiredArgsConstructor;
@@ -167,6 +168,20 @@ public class VoteService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public RoomVoteResponse getActiveVote(Long roomId) {
+        return voteRepository.findByRoomIdAndStatus(roomId, VoteStatus.PENDING)
+                .map(this::toResponse)
+                .orElse(null);
+    }
+
+    @Transactional(readOnly = true)
+    public RoomVoteResponse getVoteState(Long voteId) {
+        return voteRepository.findByIdWithBallots(voteId)
+                .map(this::toResponse)
+                .orElseThrow(() -> new ResourceNotFoundException("투표를 찾을 수 없습니다"));
+    }
+
     public static class VoteResult {
         private Long voteId;
         private VoteStatus status;
@@ -184,5 +199,28 @@ public class VoteService {
 
         public long getRequiredVotes() { return requiredVotes; }
         public void setRequiredVotes(long requiredVotes) { this.requiredVotes = requiredVotes; }
+    }
+
+    private RoomVoteResponse toResponse(RoomVote vote) {
+        long yesCount = ballotRepository.countYesVotes(vote.getVoteId());
+        long noCount = ballotRepository.countNoVotes(vote.getVoteId());
+        long activeParticipants = participantRepository.countActiveParticipantsByRoomId(vote.getRoom().getRoomId());
+        long requiredVotes = Math.max(0, activeParticipants - 1);
+
+        return RoomVoteResponse.builder()
+                .voteId(vote.getVoteId())
+                .roomId(vote.getRoom().getRoomId())
+                .voteType(vote.getVoteType().name())
+                .targetUserId(vote.getTargetUser().getUserId())
+                .targetUsername(vote.getTargetUser().getUserName())
+                .initiatedByUserId(vote.getInitiatedBy().getUserId())
+                .initiatedByUsername(vote.getInitiatedBy().getUserName())
+                .status(vote.getStatus().name())
+                .createdAt(vote.getCreatedAt())
+                .expiresAt(vote.getExpiresAt())
+                .yesCount(yesCount)
+                .noCount(noCount)
+                .requiredVotes(requiredVotes)
+                .build();
     }
 }

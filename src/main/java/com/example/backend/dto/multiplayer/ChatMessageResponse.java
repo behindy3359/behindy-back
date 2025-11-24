@@ -19,6 +19,9 @@ public class ChatMessageResponse {
     @Schema(description = "메시지 ID", example = "1")
     private Long messageId;
 
+    @Schema(description = "방 ID", example = "10")
+    private Long roomId;
+
     @Schema(description = "메시지 타입", example = "USER")
     private String messageType;
 
@@ -27,6 +30,9 @@ public class ChatMessageResponse {
 
     @Schema(description = "사용자 ID", example = "10")
     private Long userId;
+
+    @Schema(description = "사용자 이름", example = "탐험가")
+    private String username;
 
     @Schema(description = "캐릭터 이름", example = "모험가")
     private String characterName;

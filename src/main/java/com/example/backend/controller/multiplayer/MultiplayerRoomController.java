@@ -1,6 +1,7 @@
 package com.example.backend.controller.multiplayer;
 
 import com.example.backend.dto.multiplayer.RoomCreateRequest;
+import com.example.backend.dto.multiplayer.RoomDetailResponse;
 import com.example.backend.dto.multiplayer.RoomJoinRequest;
 import com.example.backend.dto.multiplayer.RoomResponse;
 import com.example.backend.service.multiplayer.MultiplayerRoomService;
@@ -67,8 +68,8 @@ public class MultiplayerRoomController {
 
     @Operation(summary = "방 상세 조회", description = "방의 상세 정보를 조회합니다")
     @GetMapping("/{roomId}")
-    public ResponseEntity<RoomResponse> getRoomDetail(@PathVariable Long roomId) {
-        RoomResponse room = roomService.getRoomDetail(roomId);
+    public ResponseEntity<RoomDetailResponse> getRoomDetail(@PathVariable Long roomId) {
+        RoomDetailResponse room = roomService.getRoomDetail(roomId);
         return ResponseEntity.ok(room);
     }
 }
