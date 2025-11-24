@@ -7,7 +7,7 @@ import com.example.backend.entity.User;
 import com.example.backend.entity.multiplayer.*;
 import com.example.backend.exception.ResourceNotFoundException;
 import com.example.backend.repository.multiplayer.*;
-import com.example.backend.service.AuthService;
+import com.example.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -28,16 +28,14 @@ public class ChatMessageService {
     private final ChatMessageRepository messageRepository;
     private final MultiplayerRoomRepository roomRepository;
     private final RoomParticipantRepository participantRepository;
+    private final UserRepository userRepository;
     private final MessageSanitizer messageSanitizer;
     private final RateLimiter rateLimiter;
-    private final AuthService authService;
 
     @Transactional
-    public ChatMessageResponse sendMessage(Long roomId, ChatMessageRequest request) {
-        User currentUser = authService.getCurrentUser();
-
-        if (!rateLimiter.allowMessage(currentUser.getUserId())) {
-            long cooldown = rateLimiter.getRemainingCooldown(currentUser.getUserId());
+    public ChatMessageResponse sendMessage(Long roomId, ChatMessageRequest request, Long userId) {
+        if (!rateLimiter.allowMessage(userId)) {
+            long cooldown = rateLimiter.getRemainingCooldown(userId);
             throw new IllegalStateException(cooldown + "ms 후에 다시 시도해주세요");
         }
 
@@ -45,11 +43,13 @@ public class ChatMessageService {
                 .orElseThrow(() -> new ResourceNotFoundException("방을 찾을 수 없습니다"));
 
         boolean isParticipant = participantRepository
-                .existsByRoomIdAndUserId(roomId, currentUser.getUserId());
+                .existsByRoomIdAndUserId(roomId, userId);
         if (!isParticipant) {
             throw new IllegalStateException("방 참가자만 메시지를 보낼 수 있습니다");
         }
 
+        User currentUser = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("사용자를 찾을 수 없습니다"));
         String sanitizedContent = messageSanitizer.sanitize(request.getContent());
 
         ChatMessage message = ChatMessage.builder()
@@ -61,7 +61,7 @@ public class ChatMessageService {
 
         message = messageRepository.save(message);
 
-        log.debug("User {} sent message in room {}", currentUser.getUserId(), roomId);
+        log.debug("User {} sent message in room {}", userId, roomId);
 
         return toMessageResponse(message);
     }

@@ -40,11 +40,11 @@ public class ChatWebSocketController {
             Long userId = getUserIdFromSession(headerAccessor);
             log.debug("Chat message from user {} in room {}", userId, roomId);
 
-            ChatMessageResponse response = chatMessageService.sendMessage(roomId, request);
+            ChatMessageResponse response = chatMessageService.sendMessage(roomId, request, userId);
 
             messagingTemplate.convertAndSend("/topic/room/" + roomId, response);
         } catch (Exception e) {
-            log.error("Error handling chat message in room {}: {}", roomId, e.getMessage());
+            log.error("Error handling chat message in room {}: {}", roomId, e.getMessage(), e);
             sendErrorToUser(headerAccessor, e.getMessage());
         }
     }
