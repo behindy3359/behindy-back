@@ -5,7 +5,7 @@ import com.example.backend.entity.multiplayer.*;
 import com.example.backend.exception.ResourceNotFoundException;
 import com.example.backend.dto.multiplayer.RoomVoteResponse;
 import com.example.backend.repository.multiplayer.*;
-import com.example.backend.service.AuthService;
+import com.example.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
@@ -26,11 +26,12 @@ public class VoteService {
     private final VoteBallotRepository ballotRepository;
     private final MultiplayerRoomRepository roomRepository;
     private final RoomParticipantRepository participantRepository;
-    private final AuthService authService;
+    private final UserRepository userRepository;
 
     @Transactional
-    public Long startKickVote(Long roomId, Long targetUserId) {
-        User currentUser = authService.getCurrentUser();
+    public Long startKickVote(Long roomId, Long targetUserId, Long userId) {
+        User currentUser = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("사용자를 찾을 수 없습니다"));
 
         MultiplayerRoom room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new ResourceNotFoundException("방을 찾을 수 없습니다"));
@@ -77,8 +78,45 @@ public class VoteService {
     }
 
     @Transactional
-    public VoteResult submitBallot(Long voteId, boolean voteValue) {
-        User currentUser = authService.getCurrentUser();
+    public Long startActionVote(Long roomId, Long userId) {
+        User currentUser = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("사용자를 찾을 수 없습니다"));
+
+        MultiplayerRoom room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new ResourceNotFoundException("방을 찾을 수 없습니다"));
+
+        boolean isParticipant = participantRepository
+                .existsByRoomIdAndUserId(roomId, userId);
+        if (!isParticipant) {
+            throw new IllegalStateException("방 참가자만 행동하기 투표를 시작할 수 있습니다");
+        }
+
+        if (voteRepository.hasPendingVote(roomId)) {
+            throw new IllegalStateException("이미 진행 중인 투표가 있습니다");
+        }
+
+        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(VOTE_DURATION_MINUTES);
+
+        RoomVote vote = RoomVote.builder()
+                .room(room)
+                .voteType(VoteType.ACTION)
+                .targetUser(null)
+                .initiatedBy(currentUser)
+                .status(VoteStatus.PENDING)
+                .expiresAt(expiresAt)
+                .build();
+
+        vote = voteRepository.save(vote);
+
+        log.info("Action vote started in room {} by user {}", roomId, userId);
+
+        return vote.getVoteId();
+    }
+
+    @Transactional
+    public VoteResult submitBallot(Long voteId, boolean voteValue, Long userId) {
+        User currentUser = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("사용자를 찾을 수 없습니다"));
 
         RoomVote vote = voteRepository.findByIdWithBallots(voteId)
                 .orElseThrow(() -> new ResourceNotFoundException("투표를 찾을 수 없습니다"));
@@ -93,7 +131,9 @@ public class VoteService {
             throw new IllegalStateException("투표 시간이 만료되었습니다");
         }
 
-        if (vote.getTargetUser().getUserId().equals(currentUser.getUserId())) {
+        if (vote.getVoteType() == VoteType.KICK &&
+            vote.getTargetUser() != null &&
+            vote.getTargetUser().getUserId().equals(currentUser.getUserId())) {
             throw new IllegalArgumentException("투표 대상자는 투표할 수 없습니다");
         }
 
@@ -117,7 +157,12 @@ public class VoteService {
 
         long activeParticipants = participantRepository
                 .countActiveParticipantsByRoomId(vote.getRoom().getRoomId());
-        long requiredVotes = activeParticipants - 1;
+        long requiredVotes;
+        if (vote.getVoteType() == VoteType.KICK) {
+            requiredVotes = activeParticipants - 1;
+        } else {
+            requiredVotes = (long) Math.ceil(activeParticipants / 2.0);
+        }
         long currentVotes = ballotRepository.countByVoteId(voteId);
 
         VoteResult result = new VoteResult();
@@ -128,19 +173,30 @@ public class VoteService {
         if (currentVotes >= requiredVotes) {
             long yesVotes = ballotRepository.countYesVotes(voteId);
 
-            if (yesVotes == requiredVotes) {
+            boolean passed = false;
+            if (vote.getVoteType() == VoteType.KICK) {
+                passed = (yesVotes == requiredVotes);
+            } else {
+                passed = (yesVotes >= requiredVotes);
+            }
+
+            if (passed) {
                 vote.pass();
                 result.setStatus(VoteStatus.PASSED);
 
-                RoomParticipant targetParticipant = participantRepository
-                        .findByRoomIdAndUserId(vote.getRoom().getRoomId(),
-                                             vote.getTargetUser().getUserId())
-                        .orElseThrow();
-                targetParticipant.leave();
-                participantRepository.save(targetParticipant);
+                if (vote.getVoteType() == VoteType.KICK && vote.getTargetUser() != null) {
+                    RoomParticipant targetParticipant = participantRepository
+                            .findByRoomIdAndUserId(vote.getRoom().getRoomId(),
+                                                 vote.getTargetUser().getUserId())
+                            .orElseThrow();
+                    targetParticipant.leave();
+                    participantRepository.save(targetParticipant);
 
-                log.info("Vote {} passed - user {} kicked from room {}",
-                    voteId, vote.getTargetUser().getUserId(), vote.getRoom().getRoomId());
+                    log.info("Vote {} passed - user {} kicked from room {}",
+                        voteId, vote.getTargetUser().getUserId(), vote.getRoom().getRoomId());
+                } else {
+                    log.info("Vote {} passed - action approved", voteId);
+                }
             } else {
                 vote.fail();
                 result.setStatus(VoteStatus.FAILED);
@@ -205,14 +261,23 @@ public class VoteService {
         long yesCount = ballotRepository.countYesVotes(vote.getVoteId());
         long noCount = ballotRepository.countNoVotes(vote.getVoteId());
         long activeParticipants = participantRepository.countActiveParticipantsByRoomId(vote.getRoom().getRoomId());
-        long requiredVotes = Math.max(0, activeParticipants - 1);
+
+        long requiredVotes;
+        if (vote.getVoteType() == VoteType.KICK) {
+            requiredVotes = Math.max(0, activeParticipants - 1);
+        } else {
+            requiredVotes = (long) Math.ceil(activeParticipants / 2.0);
+        }
+
+        Long targetUserId = vote.getTargetUser() != null ? vote.getTargetUser().getUserId() : null;
+        String targetUsername = vote.getTargetUser() != null ? vote.getTargetUser().getUserName() : null;
 
         return RoomVoteResponse.builder()
                 .voteId(vote.getVoteId())
                 .roomId(vote.getRoom().getRoomId())
                 .voteType(vote.getVoteType().name())
-                .targetUserId(vote.getTargetUser().getUserId())
-                .targetUsername(vote.getTargetUser().getUserName())
+                .targetUserId(targetUserId)
+                .targetUsername(targetUsername)
                 .initiatedByUserId(vote.getInitiatedBy().getUserId())
                 .initiatedByUsername(vote.getInitiatedBy().getUserName())
                 .status(vote.getStatus().name())

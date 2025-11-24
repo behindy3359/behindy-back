@@ -58,22 +58,26 @@ public class ChatWebSocketController {
             Long userId = getUserIdFromSession(headerAccessor);
             log.info("Action request from user {} in room {}", userId, roomId);
 
-            ChatMessageResponse thinkingMessage = chatMessageService.sendSystemMessage(
+            Long voteId = voteService.startActionVote(roomId, userId);
+
+            ChatMessageResponse voteMessage = chatMessageService.sendSystemMessage(
                     roomId,
-                    "AI가 생각 중...",
-                    Map.of("type", "thinking")
+                    "행동하기 투표가 시작되었습니다",
+                    Map.of(
+                        "type", "vote_start",
+                        "voteId", voteId
+                    )
             );
 
-            messagingTemplate.convertAndSend("/topic/room/" + roomId, thinkingMessage);
+            messagingTemplate.convertAndSend("/topic/room/" + roomId, voteMessage);
 
-            llmIntegrationService.generateNextPhase(roomId)
-                    .thenAccept(result -> log.info("LLM 응답 처리 완료: Room {}", roomId))
-                    .exceptionally(ex -> {
-                        log.error("LLM 응답 처리 실패: Room {}", roomId, ex);
-                        sendErrorToRoom(roomId, "AI 응답 생성에 실패했습니다");
-                        return null;
-                    });
-
+            RoomVoteResponse voteState = voteService.getVoteState(voteId);
+            ChatMessageResponse voteStateMessage = chatMessageService.sendVoteMessage(
+                    roomId,
+                    voteState,
+                    "vote_state"
+            );
+            messagingTemplate.convertAndSend("/topic/room/" + roomId, voteStateMessage);
         } catch (Exception e) {
             log.error("Error handling action in room {}: {}", roomId, e.getMessage());
             sendErrorToUser(headerAccessor, e.getMessage());
@@ -92,7 +96,7 @@ public class ChatWebSocketController {
 
             log.info("Kick vote started by user {} for user {} in room {}", userId, targetUserId, roomId);
 
-            Long voteId = voteService.startKickVote(roomId, targetUserId);
+            Long voteId = voteService.startKickVote(roomId, targetUserId, userId);
 
             ChatMessageResponse voteMessage = chatMessageService.sendSystemMessage(
                     roomId,
@@ -132,7 +136,7 @@ public class ChatWebSocketController {
 
             log.debug("User {} submitted ballot for vote {} in room {}", userId, voteId, roomId);
 
-            VoteService.VoteResult result = voteService.submitBallot(voteId, vote);
+            VoteService.VoteResult result = voteService.submitBallot(voteId, vote, userId);
 
             RoomVoteResponse voteState = voteService.getVoteState(voteId);
             ChatMessageResponse voteStateMessage = chatMessageService.sendVoteMessage(
@@ -143,9 +147,16 @@ public class ChatWebSocketController {
             messagingTemplate.convertAndSend("/topic/room/" + roomId, voteStateMessage);
 
             if (result.getStatus() != com.example.backend.entity.multiplayer.VoteStatus.PENDING) {
-                String messageContent = result.getStatus() ==
-                    com.example.backend.entity.multiplayer.VoteStatus.PASSED ?
-                        "추방 투표가 가결되었습니다" : "추방 투표가 부결되었습니다";
+                String messageContent;
+                if (voteState.getVoteType().equals("KICK")) {
+                    messageContent = result.getStatus() ==
+                        com.example.backend.entity.multiplayer.VoteStatus.PASSED ?
+                            "추방 투표가 가결되었습니다" : "추방 투표가 부결되었습니다";
+                } else {
+                    messageContent = result.getStatus() ==
+                        com.example.backend.entity.multiplayer.VoteStatus.PASSED ?
+                            "행동하기 투표가 가결되었습니다" : "행동하기 투표가 부결되었습니다";
+                }
 
                 ChatMessageResponse voteResultMessage = chatMessageService.sendSystemMessage(
                         roomId,
@@ -158,6 +169,25 @@ public class ChatWebSocketController {
                 );
 
                 messagingTemplate.convertAndSend("/topic/room/" + roomId, voteResultMessage);
+
+                if (voteState.getVoteType().equals("ACTION") &&
+                    result.getStatus() == com.example.backend.entity.multiplayer.VoteStatus.PASSED) {
+
+                    ChatMessageResponse thinkingMessage = chatMessageService.sendSystemMessage(
+                            roomId,
+                            "AI가 생각 중...",
+                            Map.of("type", "thinking")
+                    );
+                    messagingTemplate.convertAndSend("/topic/room/" + roomId, thinkingMessage);
+
+                    llmIntegrationService.generateNextPhase(roomId)
+                            .thenAccept(llmResult -> log.info("LLM 응답 처리 완료: Room {}", roomId))
+                            .exceptionally(ex -> {
+                                log.error("LLM 응답 처리 실패: Room {}", roomId, ex);
+                                sendErrorToRoom(roomId, "AI 응답 생성에 실패했습니다");
+                                return null;
+                            });
+                }
             }
         } catch (Exception e) {
             log.error("Error submitting ballot in room {}: {}", roomId, e.getMessage());

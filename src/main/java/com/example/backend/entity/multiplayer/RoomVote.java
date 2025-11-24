@@ -38,7 +38,7 @@ public class RoomVote {
     private VoteType voteType;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "target_user_id", nullable = false)
+    @JoinColumn(name = "target_user_id", nullable = true)
     private User targetUser;
 
     @ManyToOne(fetch = FetchType.LAZY)
