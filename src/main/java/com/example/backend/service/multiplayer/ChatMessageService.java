@@ -57,6 +57,7 @@ public class ChatMessageService {
                 .user(currentUser)
                 .messageType(MessageType.USER)
                 .content(sanitizedContent)
+                .phase(room.getCurrentPhase())
                 .build();
 
         message = messageRepository.save(message);
@@ -96,6 +97,7 @@ public class ChatMessageService {
                 .user(null)
                 .messageType(MessageType.LLM)
                 .content(content)
+                .phase(phase)
                 .metadata(Map.of("phase", phase))
                 .build();
 
@@ -116,6 +118,7 @@ public class ChatMessageService {
                 .user(null)
                 .messageType(MessageType.PHASE)
                 .content(content)
+                .phase(phase)
                 .metadata(Map.of("phase", phase))
                 .build();
 

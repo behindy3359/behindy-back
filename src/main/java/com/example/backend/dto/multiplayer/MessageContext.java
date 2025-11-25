@@ -10,6 +10,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class MessageContext {
-    private String username;
+    private String characterName;
     private String content;
 }

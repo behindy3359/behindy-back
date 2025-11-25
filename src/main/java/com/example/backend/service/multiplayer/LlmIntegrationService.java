@@ -111,11 +111,20 @@ public class LlmIntegrationService {
                                             List<RoomParticipant> participants,
                                             List<ChatMessage> messages,
                                             boolean isIntro) {
+        Map<Long, String> userIdToCharacterName = participants.stream()
+                .collect(Collectors.toMap(
+                        p -> p.getUser().getUserId(),
+                        p -> p.getCharacter().getCharName()
+                ));
+
         List<MessageContext> messageStack = messages.stream()
-                .map(msg -> MessageContext.builder()
-                        .username(msg.getUser().getUsername())
-                        .content(msg.getContent())
-                        .build())
+                .map(msg -> {
+                    String characterName = userIdToCharacterName.get(msg.getUser().getUserId());
+                    return MessageContext.builder()
+                            .characterName(characterName != null ? characterName : msg.getUser().getUsername())
+                            .content(msg.getContent())
+                            .build();
+                })
                 .collect(Collectors.toList());
 
         List<ParticipantContext> participantContexts = participants.stream()
