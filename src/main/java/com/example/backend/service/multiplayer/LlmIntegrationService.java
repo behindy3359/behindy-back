@@ -121,7 +121,7 @@ public class LlmIntegrationService {
                 .map(msg -> {
                     String characterName = userIdToCharacterName.get(msg.getUser().getUserId());
                     return MessageContext.builder()
-                            .characterName(characterName != null ? characterName : msg.getUser().getUsername())
+                            .characterName(characterName != null ? characterName : msg.getUser().getUserName())
                             .content(msg.getContent())
                             .build();
                 })
