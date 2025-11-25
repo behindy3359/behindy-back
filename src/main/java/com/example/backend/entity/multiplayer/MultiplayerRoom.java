@@ -48,6 +48,13 @@ public class MultiplayerRoom {
     @Builder.Default
     private Integer currentPhase = 0;
 
+    @Column(name = "is_llm_processing", nullable = false)
+    @Builder.Default
+    private Boolean isLlmProcessing = false;
+
+    @Column(name = "story_outline", columnDefinition = "TEXT")
+    private String storyOutline;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     @Builder.Default
