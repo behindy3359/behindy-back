@@ -1,21 +1,14 @@
 package com.example.backend.service.multiplayer;
 
-import com.example.backend.dto.multiplayer.ChatMessageResponse;
-import com.example.backend.entity.multiplayer.ChatMessage;
-import com.example.backend.entity.multiplayer.MultiplayerRoom;
-import com.example.backend.entity.multiplayer.MultiplayerStoryState;
-import com.example.backend.entity.multiplayer.RoomParticipant;
-import com.example.backend.repository.multiplayer.ChatMessageRepository;
-import com.example.backend.repository.multiplayer.MultiplayerRoomRepository;
-import com.example.backend.repository.multiplayer.MultiplayerStoryStateRepository;
-import com.example.backend.repository.multiplayer.RoomParticipantRepository;
+import com.example.backend.dto.multiplayer.*;
+import com.example.backend.entity.multiplayer.*;
+import com.example.backend.repository.multiplayer.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Async;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -41,7 +34,7 @@ public class LlmIntegrationService {
     private final ChatMessageService chatMessageService;
     private final SimpMessagingTemplate messagingTemplate;
 
-    @Value("${ai.server.timeout:30000}")
+    @Value("${ai.server.timeout:60000}")
     private int aiServerTimeout;
 
     @Async
@@ -53,29 +46,40 @@ public class LlmIntegrationService {
             MultiplayerRoom room = roomRepository.findByIdWithParticipants(roomId)
                     .orElseThrow(() -> new IllegalArgumentException("방을 찾을 수 없습니다"));
 
+            if (room.getIsLlmProcessing()) {
+                log.warn("이미 LLM 처리 중: Room {}", roomId);
+                return CompletableFuture.completedFuture(null);
+            }
+
+            room.setIsLlmProcessing(true);
+            roomRepository.save(room);
+
             List<RoomParticipant> activeParticipants = participantRepository
                     .findActiveParticipantsByRoomId(roomId);
 
             if (activeParticipants.isEmpty()) {
                 log.warn("활성 참여자가 없습니다: Room {}", roomId);
+                room.setIsLlmProcessing(false);
+                roomRepository.save(room);
                 return CompletableFuture.completedFuture(null);
             }
 
-            List<ChatMessage> recentMessages = chatMessageRepository
-                    .findByRoomIdOrderByCreatedAtDesc(roomId, PageRequest.of(0, 100));
+            sendAiThinkingMessage(roomId);
 
-            MultiplayerStoryRequest request = buildLlmRequest(room, activeParticipants, recentMessages);
+            boolean isIntro = room.getCurrentPhase() == 0;
+            List<ChatMessage> messageStack = isIntro ? Collections.emptyList() :
+                getMessageStack(roomId, room.getCurrentPhase());
+
+            LlmStoryRequest request = buildLlmRequest(room, activeParticipants, messageStack, isIntro);
 
             return callLlmServer(request)
                     .toFuture()
                     .thenAccept(response -> {
-                        saveStoryState(room, response);
-                        updateParticipantStates(activeParticipants, response.getParticipantUpdates());
-                        broadcastLlmResponse(roomId, response);
+                        handleLlmResponse(room, activeParticipants, response);
                     })
                     .exceptionally(e -> {
                         log.error("LLM 생성 실패: Room {}", roomId, e);
-                        broadcastErrorMessage(roomId, "AI 응답 생성에 실패했습니다");
+                        handleLlmFailure(room);
                         return null;
                     });
 
@@ -85,99 +89,150 @@ public class LlmIntegrationService {
         }
     }
 
-    private MultiplayerStoryRequest buildLlmRequest(MultiplayerRoom room,
-                                                     List<RoomParticipant> participants,
-                                                     List<ChatMessage> messages) {
-        MultiplayerStoryRequest request = new MultiplayerStoryRequest();
-        request.setStationId(room.getStation().getStaId().intValue());
-        request.setStationName(room.getStation().getStaName());
-        request.setLineNumber(room.getStation().getStaLine());
-        request.setCurrentPhase(room.getCurrentPhase());
+    private List<ChatMessage> getMessageStack(Long roomId, Integer currentPhase) {
+        List<ChatMessage> messages = chatMessageRepository
+                .findByRoomIdAndMessageTypeAndPhaseOrderByCreatedAtAsc(
+                    roomId,
+                    MessageType.USER,
+                    currentPhase
+                );
 
-        MultiplayerStoryState latestState = storyStateRepository
-                .findLatestByRoomId(room.getRoomId())
-                .orElse(null);
-
-        if (latestState != null) {
-            request.setSummary(latestState.getSummary());
+        if (messages.size() > 20) {
+            messages = messages.subList(messages.size() - 20, messages.size());
         }
 
-        List<ChatHistoryItem> historyItems = messages.stream()
-                .map(msg -> {
-                    ChatHistoryItem item = new ChatHistoryItem();
-                    String characterName = msg.getMetadata() != null ?
-                            (String) msg.getMetadata().get("characterName") : "Unknown";
-                    item.setCharacterName(characterName);
-                    item.setContent(msg.getContent());
-                    return item;
-                })
-                .collect(Collectors.toList());
+        log.info("대화 스택 조회: Room {} Phase {} - {}개 메시지",
+            roomId, currentPhase, messages.size());
 
-        request.setRecentMessages(historyItems);
-
-        List<ParticipantInfo> participantInfos = participants.stream()
-                .map(p -> {
-                    ParticipantInfo info = new ParticipantInfo();
-                    info.setCharacterName(p.getCharacter().getCharName());
-                    info.setHp(p.getHp());
-                    info.setSanity(p.getSanity());
-                    return info;
-                })
-                .collect(Collectors.toList());
-
-        request.setParticipants(participantInfos);
-
-        return request;
+        return messages;
     }
 
-    private Mono<MultiplayerStoryResponse> callLlmServer(MultiplayerStoryRequest request) {
-        log.info("LLM Server 호출: {} Phase {}", request.getStationName(), request.getCurrentPhase());
+    private LlmStoryRequest buildLlmRequest(MultiplayerRoom room,
+                                            List<RoomParticipant> participants,
+                                            List<ChatMessage> messages,
+                                            boolean isIntro) {
+        List<MessageContext> messageStack = messages.stream()
+                .map(msg -> MessageContext.builder()
+                        .username(msg.getUser().getUsername())
+                        .content(msg.getContent())
+                        .build())
+                .collect(Collectors.toList());
+
+        List<ParticipantContext> participantContexts = participants.stream()
+                .map(p -> ParticipantContext.builder()
+                        .characterName(p.getCharacter().getCharName())
+                        .hp(p.getHp())
+                        .sanity(p.getSanity())
+                        .build())
+                .collect(Collectors.toList());
+
+        return LlmStoryRequest.builder()
+                .roomId(room.getRoomId())
+                .phase(room.getCurrentPhase())
+                .stationName(room.getStation().getStaName())
+                .storyOutline(room.getStoryOutline())
+                .participants(participantContexts)
+                .messageStack(messageStack)
+                .isIntro(isIntro)
+                .build();
+    }
+
+    private Mono<LlmStoryResponse> callLlmServer(LlmStoryRequest request) {
+        log.info("LLM Server 호출: Room {} Phase {} isIntro={}",
+            request.getRoomId(), request.getPhase(), request.getIsIntro());
 
         return llmWebClient.post()
-                .uri("/llm/multiplayer/next-phase")
+                .uri("/api/multiplayer/generate-story")
                 .header("X-Internal-API-Key", "behindy-internal-2025-secret-key")
                 .bodyValue(request)
                 .retrieve()
-                .bodyToMono(MultiplayerStoryResponse.class)
+                .bodyToMono(LlmStoryResponse.class)
                 .timeout(Duration.ofMillis(aiServerTimeout))
-                .doOnSuccess(response -> log.info("LLM Server 응답 성공"))
+                .doOnSuccess(response -> log.info("LLM Server 응답 성공: Phase {}", response.getPhase()))
                 .doOnError(e -> log.error("LLM Server 호출 실패", e));
     }
 
     @Transactional
-    protected void saveStoryState(MultiplayerRoom room, MultiplayerStoryResponse response) {
+    protected void handleLlmResponse(MultiplayerRoom room,
+                                     List<RoomParticipant> participants,
+                                     LlmStoryResponse response) {
+        try {
+            saveStoryState(room, response);
+            updateParticipantStates(participants, response.getEffects());
+
+            if (response.getStoryOutline() != null && !response.getStoryOutline().isEmpty()) {
+                room.setStoryOutline(response.getStoryOutline());
+            }
+
+            room.setCurrentPhase(response.getPhase());
+
+            if (response.getIsEnding()) {
+                room.finish();
+                log.info("스토리 종료: Room {}", room.getRoomId());
+            }
+
+            room.setIsLlmProcessing(false);
+            roomRepository.save(room);
+
+            broadcastLlmResponse(room.getRoomId(), response);
+            broadcastParticipantUpdates(room.getRoomId(), participants);
+
+        } catch (Exception e) {
+            log.error("LLM 응답 처리 실패: Room {}", room.getRoomId(), e);
+            handleLlmFailure(room);
+        }
+    }
+
+    @Transactional
+    protected void handleLlmFailure(MultiplayerRoom room) {
+        try {
+            room.setIsLlmProcessing(false);
+            roomRepository.save(room);
+            broadcastErrorMessage(room.getRoomId(), "AI 응답 생성에 실패했습니다. 다시 시도해주세요.");
+        } catch (Exception e) {
+            log.error("LLM 실패 처리 중 에러: Room {}", room.getRoomId(), e);
+        }
+    }
+
+    @Transactional
+    protected void saveStoryState(MultiplayerRoom room, LlmStoryResponse response) {
         MultiplayerStoryState state = MultiplayerStoryState.builder()
                 .room(room)
-                .phase(room.getCurrentPhase())
-                .llmResponse(response.getContent())
-                .summary(response.getSummary())
+                .phase(response.getPhase())
+                .llmResponse(response.getStoryText())
+                .summary(room.getStoryOutline())
                 .context(new HashMap<>())
                 .build();
 
         storyStateRepository.save(state);
-        log.info("스토리 상태 저장 완료: Room {} Phase {}", room.getRoomId(), room.getCurrentPhase());
+        log.info("스토리 상태 저장 완료: Room {} Phase {}", room.getRoomId(), response.getPhase());
     }
 
     @Transactional
     protected void updateParticipantStates(List<RoomParticipant> participants,
-                                           List<ParticipantUpdate> updates) {
-        Map<String, ParticipantUpdate> updateMap = updates.stream()
+                                           List<CharacterEffect> effects) {
+        if (effects == null || effects.isEmpty()) {
+            log.info("HP/Sanity 변화 없음");
+            return;
+        }
+
+        Map<String, CharacterEffect> effectMap = effects.stream()
                 .collect(Collectors.toMap(
-                        ParticipantUpdate::getCharacterName,
-                        u -> u,
-                        (u1, u2) -> u1
+                        CharacterEffect::getCharacterName,
+                        e -> e,
+                        (e1, e2) -> e1
                 ));
 
         for (RoomParticipant participant : participants) {
             String characterName = participant.getCharacter().getCharName();
-            ParticipantUpdate update = updateMap.get(characterName);
-            if (update != null) {
-                if (update.getHpChange() != 0) {
-                    int newHp = Math.max(0, Math.min(100, participant.getHp() + update.getHpChange()));
+            CharacterEffect effect = effectMap.get(characterName);
+            if (effect != null) {
+                if (effect.getHpChange() != 0) {
+                    int newHp = Math.max(0, Math.min(100, participant.getHp() + effect.getHpChange()));
                     participant.setHp(newHp);
                 }
-                if (update.getSanityChange() != 0) {
-                    int newSanity = Math.max(0, Math.min(100, participant.getSanity() + update.getSanityChange()));
+                if (effect.getSanityChange() != 0) {
+                    int newSanity = Math.max(0, Math.min(100, participant.getSanity() + effect.getSanityChange()));
                     participant.setSanity(newSanity);
                 }
 
@@ -186,26 +241,75 @@ public class LlmIntegrationService {
                 log.info("참여자 상태 업데이트: {} HP:{}{} Sanity:{}{}",
                         characterName,
                         participant.getHp(),
-                        update.getHpChange() > 0 ? "+" + update.getHpChange() : update.getHpChange(),
+                        effect.getHpChange() > 0 ? "+" + effect.getHpChange() : effect.getHpChange(),
                         participant.getSanity(),
-                        update.getSanityChange() > 0 ? "+" + update.getSanityChange() : update.getSanityChange()
+                        effect.getSanityChange() > 0 ? "+" + effect.getSanityChange() : effect.getSanityChange()
                 );
+
+                if (participant.getHp() <= 0) {
+                    handleParticipantDeath(participant);
+                }
             }
         }
     }
 
-    private void broadcastLlmResponse(Long roomId, MultiplayerStoryResponse response) {
-        MultiplayerRoom room = roomRepository.findById(roomId)
-                .orElseThrow(() -> new IllegalArgumentException("방을 찾을 수 없습니다"));
+    @Transactional
+    protected void handleParticipantDeath(RoomParticipant participant) {
+        participant.leave();
+        participantRepository.save(participant);
 
-        ChatMessageResponse phaseMessage = chatMessageService.sendPhaseMessage(
+        String deathMessage = String.format("%s님이 사망하여 방에서 퇴장합니다.",
+            participant.getCharacter().getCharName());
+        broadcastSystemMessage(participant.getRoom().getRoomId(), deathMessage);
+
+        log.info("참여자 사망 처리: Room {} Character {}",
+            participant.getRoom().getRoomId(),
+            participant.getCharacter().getCharName());
+    }
+
+    private void sendAiThinkingMessage(Long roomId) {
+        ChatMessageResponse thinkingMsg = chatMessageService.sendSystemMessage(
                 roomId,
-                response.getContent(),
-                room.getCurrentPhase()
+                "AI가 생각 중...",
+                Map.of("type", "llm_thinking")
+        );
+        messagingTemplate.convertAndSend("/topic/room/" + roomId, thinkingMsg);
+    }
+
+    private void broadcastLlmResponse(Long roomId, LlmStoryResponse response) {
+        ChatMessageResponse storyMessage = chatMessageService.sendLlmMessage(
+                roomId,
+                response.getStoryText(),
+                response.getPhase()
         );
 
-        messagingTemplate.convertAndSend("/topic/room/" + roomId, phaseMessage);
-        log.info("LLM 응답 브로드캐스트 완료: Room {}", roomId);
+        messagingTemplate.convertAndSend("/topic/room/" + roomId, storyMessage);
+        log.info("LLM 응답 브로드캐스트 완료: Room {} Phase {}", roomId, response.getPhase());
+    }
+
+    private void broadcastParticipantUpdates(Long roomId, List<RoomParticipant> participants) {
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("type", "participant_update");
+        updates.put("participants", participants.stream()
+            .map(p -> Map.of(
+                "participantId", p.getParticipantId(),
+                "characterName", p.getCharacter().getCharName(),
+                "hp", p.getHp(),
+                "sanity", p.getSanity(),
+                "isActive", p.isActive()
+            ))
+            .collect(Collectors.toList()));
+
+        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/participants", updates);
+    }
+
+    private void broadcastSystemMessage(Long roomId, String message) {
+        ChatMessageResponse systemMsg = chatMessageService.sendSystemMessage(
+                roomId,
+                message,
+                Map.of("type", "info")
+        );
+        messagingTemplate.convertAndSend("/topic/room/" + roomId, systemMsg);
     }
 
     private void broadcastErrorMessage(Long roomId, String errorMessage) {
@@ -219,92 +323,5 @@ public class LlmIntegrationService {
         } catch (Exception e) {
             log.error("에러 메시지 브로드캐스트 실패: Room {}", roomId, e);
         }
-    }
-
-    public static class MultiplayerStoryRequest {
-        private int stationId;
-        private String stationName;
-        private int lineNumber;
-        private int currentPhase;
-        private String summary;
-        private List<ChatHistoryItem> recentMessages;
-        private List<ParticipantInfo> participants;
-
-        public int getStationId() { return stationId; }
-        public void setStationId(int stationId) { this.stationId = stationId; }
-
-        public String getStationName() { return stationName; }
-        public void setStationName(String stationName) { this.stationName = stationName; }
-
-        public int getLineNumber() { return lineNumber; }
-        public void setLineNumber(int lineNumber) { this.lineNumber = lineNumber; }
-
-        public int getCurrentPhase() { return currentPhase; }
-        public void setCurrentPhase(int currentPhase) { this.currentPhase = currentPhase; }
-
-        public String getSummary() { return summary; }
-        public void setSummary(String summary) { this.summary = summary; }
-
-        public List<ChatHistoryItem> getRecentMessages() { return recentMessages; }
-        public void setRecentMessages(List<ChatHistoryItem> recentMessages) { this.recentMessages = recentMessages; }
-
-        public List<ParticipantInfo> getParticipants() { return participants; }
-        public void setParticipants(List<ParticipantInfo> participants) { this.participants = participants; }
-    }
-
-    public static class ChatHistoryItem {
-        private String characterName;
-        private String content;
-
-        public String getCharacterName() { return characterName; }
-        public void setCharacterName(String characterName) { this.characterName = characterName; }
-
-        public String getContent() { return content; }
-        public void setContent(String content) { this.content = content; }
-    }
-
-    public static class ParticipantInfo {
-        private String characterName;
-        private int hp;
-        private int sanity;
-
-        public String getCharacterName() { return characterName; }
-        public void setCharacterName(String characterName) { this.characterName = characterName; }
-
-        public int getHp() { return hp; }
-        public void setHp(int hp) { this.hp = hp; }
-
-        public int getSanity() { return sanity; }
-        public void setSanity(int sanity) { this.sanity = sanity; }
-    }
-
-    public static class MultiplayerStoryResponse {
-        private String content;
-        private String summary;
-        private List<ParticipantUpdate> participantUpdates;
-
-        public String getContent() { return content; }
-        public void setContent(String content) { this.content = content; }
-
-        public String getSummary() { return summary; }
-        public void setSummary(String summary) { this.summary = summary; }
-
-        public List<ParticipantUpdate> getParticipantUpdates() { return participantUpdates; }
-        public void setParticipantUpdates(List<ParticipantUpdate> participantUpdates) { this.participantUpdates = participantUpdates; }
-    }
-
-    public static class ParticipantUpdate {
-        private String characterName;
-        private int hpChange;
-        private int sanityChange;
-
-        public String getCharacterName() { return characterName; }
-        public void setCharacterName(String characterName) { this.characterName = characterName; }
-
-        public int getHpChange() { return hpChange; }
-        public void setHpChange(int hpChange) { this.hpChange = hpChange; }
-
-        public int getSanityChange() { return sanityChange; }
-        public void setSanityChange(int sanityChange) { this.sanityChange = sanityChange; }
     }
 }
