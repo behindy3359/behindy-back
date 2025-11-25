@@ -1,11 +1,15 @@
 package com.example.backend.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import io.netty.channel.ChannelOption;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import org.springframework.http.codec.json.Jackson2JsonDecoder;
+import org.springframework.http.codec.json.Jackson2JsonEncoder;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
@@ -58,9 +62,14 @@ public class WebClientConfig {
                 .responseTimeout(Duration.ofMillis(aiServerTimeout))
                 .followRedirect(true);
 
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
+
         ExchangeStrategies strategies = ExchangeStrategies.builder()
                 .codecs(configurer -> {
                     configurer.defaultCodecs().maxInMemorySize(10 * 1024 * 1024);
+                    configurer.defaultCodecs().jackson2JsonEncoder(new Jackson2JsonEncoder(objectMapper));
+                    configurer.defaultCodecs().jackson2JsonDecoder(new Jackson2JsonDecoder(objectMapper));
                 })
                 .build();
 
@@ -72,7 +81,7 @@ public class WebClientConfig {
                 .exchangeStrategies(strategies)
                 .build();
 
-        log.info("LLM WebClient 초기화 완료:");
+        log.info("LLM WebClient 초기화 완료: snake_case 변환 활성화");
 
         return client;
     }
