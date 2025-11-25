@@ -35,4 +35,10 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             @Param("roomId") Long roomId,
             @Param("lastMessageId") Long lastMessageId,
             Pageable pageable);
+
+    @Query("SELECT m FROM ChatMessage m WHERE m.room.roomId = :roomId AND m.messageType = :type AND m.phase = :phase ORDER BY m.createdAt ASC")
+    List<ChatMessage> findByRoomIdAndMessageTypeAndPhaseOrderByCreatedAtAsc(
+            @Param("roomId") Long roomId,
+            @Param("type") MessageType type,
+            @Param("phase") Integer phase);
 }
