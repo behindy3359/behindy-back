@@ -53,7 +53,9 @@ public class MultiplayerRoomService {
         List<RoomParticipant> activeParticipations = participantRepository
                 .findActiveParticipantsByUserId(currentUser.getUserId());
         if (!activeParticipations.isEmpty()) {
-            throw new IllegalStateException("이미 다른 방에 참가 중입니다");
+            log.info("User {} has active participations, leaving {} rooms before creating new room",
+                currentUser.getUserId(), activeParticipations.size());
+            leaveAllActiveRooms(currentUser);
         }
 
         MultiplayerRoom room = MultiplayerRoom.builder()
@@ -123,7 +125,9 @@ public class MultiplayerRoomService {
         List<RoomParticipant> activeParticipations = participantRepository
                 .findActiveParticipantsByUserId(currentUser.getUserId());
         if (!activeParticipations.isEmpty()) {
-            throw new IllegalStateException("이미 다른 방에 참가 중입니다");
+            log.info("User {} has active participations, leaving {} rooms before joining room {}",
+                currentUser.getUserId(), activeParticipations.size(), roomId);
+            leaveAllActiveRooms(currentUser);
         }
 
         RoomParticipant participant = RoomParticipant.builder()
@@ -264,6 +268,45 @@ public class MultiplayerRoomService {
                 .participants(participantResponses)
                 .createdAt(room.getCreatedAt())
                 .build();
+    }
+
+    /**
+     * 사용자가 참가 중인 모든 활성 방에서 퇴장합니다.
+     * 새 방 생성이나 참가 전에 자동으로 호출됩니다.
+     */
+    private void leaveAllActiveRooms(User user) {
+        List<RoomParticipant> activeParticipations = participantRepository
+                .findActiveParticipantsByUserId(user.getUserId());
+
+        for (RoomParticipant participant : activeParticipations) {
+            try {
+                participant.leave();
+                participantRepository.save(participant);
+
+                MultiplayerRoom room = participant.getRoom();
+                long activeCount = participantRepository.countActiveParticipantsByRoomId(room.getRoomId());
+
+                if (activeCount == 0) {
+                    room.finish();
+                    roomRepository.save(room);
+                    log.info("Room {} finished - all participants left during auto-exit", room.getRoomId());
+                } else if (room.getOwner().getUserId().equals(user.getUserId())) {
+                    List<RoomParticipant> remainingParticipants = participantRepository
+                            .findActiveParticipantsByRoomId(room.getRoomId());
+                    if (!remainingParticipants.isEmpty()) {
+                        room.setOwner(remainingParticipants.get(0).getUser());
+                        roomRepository.save(room);
+                        log.info("Room {} owner transferred to user {} during auto-exit",
+                            room.getRoomId(), remainingParticipants.get(0).getUser().getUserId());
+                    }
+                }
+
+                log.info("User {} automatically left room {}", user.getUserId(), room.getRoomId());
+            } catch (Exception e) {
+                log.error("Failed to auto-leave room {} for user {}",
+                    participant.getRoom().getRoomId(), user.getUserId(), e);
+            }
+        }
     }
 
     /**
