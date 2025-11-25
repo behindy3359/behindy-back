@@ -21,7 +21,8 @@ import java.util.Map;
 @Table(name = "chat_message",
     indexes = {
         @Index(name = "idx_message_room_time", columnList = "room_id, created_at DESC"),
-        @Index(name = "idx_message_room_type", columnList = "room_id, message_type")
+        @Index(name = "idx_message_room_type", columnList = "room_id, message_type"),
+        @Index(name = "idx_message_stack", columnList = "room_id, message_type, phase, created_at")
     }
 )
 public class ChatMessage {
@@ -42,6 +43,10 @@ public class ChatMessage {
     @Enumerated(EnumType.STRING)
     @Column(name = "message_type", nullable = false, length = 20)
     private MessageType messageType;
+
+    @Column(name = "phase", nullable = false)
+    @Builder.Default
+    private Integer phase = 0;
 
     @Column(name = "content", nullable = false, columnDefinition = "TEXT")
     private String content;
