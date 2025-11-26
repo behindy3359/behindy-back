@@ -95,6 +95,34 @@ public class VoteService {
             throw new IllegalStateException("이미 진행 중인 투표가 있습니다");
         }
 
+        long activeParticipants = participantRepository.countActiveParticipantsByRoomId(roomId);
+
+        // 혼자 플레이하는 경우 즉시 통과
+        if (activeParticipants == 1) {
+            LocalDateTime now = LocalDateTime.now();
+            RoomVote vote = RoomVote.builder()
+                    .room(room)
+                    .voteType(VoteType.ACTION)
+                    .targetUser(null)
+                    .initiatedBy(currentUser)
+                    .status(VoteStatus.PASSED)  // 즉시 통과
+                    .expiresAt(now)
+                    .build();
+
+            vote = voteRepository.save(vote);
+
+            // 자동으로 찬성표 제출
+            VoteBallot ballot = VoteBallot.builder()
+                    .roomVote(vote)
+                    .user(currentUser)
+                    .vote(true)
+                    .build();
+            ballotRepository.save(ballot);
+
+            log.info("Action vote auto-passed for solo player in room {}", roomId);
+            return vote.getVoteId();
+        }
+
         LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(VOTE_DURATION_MINUTES);
 
         RoomVote vote = RoomVote.builder()
@@ -108,7 +136,22 @@ public class VoteService {
 
         vote = voteRepository.save(vote);
 
-        log.info("Action vote started in room {} by user {}", roomId, userId);
+        // 투표를 시작한 사람은 자동으로 찬성
+        VoteBallot initiatorBallot = VoteBallot.builder()
+                .roomVote(vote)
+                .user(currentUser)
+                .vote(true)
+                .build();
+        ballotRepository.save(initiatorBallot);
+
+        log.info("Action vote started in room {} by user {} (auto-voted yes)", roomId, userId);
+
+        // 2인 플레이에서 한 명이 찬성하면 과반수이므로 즉시 통과
+        if (activeParticipants == 2) {
+            vote.pass();
+            voteRepository.save(vote);
+            log.info("Action vote auto-passed for 2-player room {}", roomId);
+        }
 
         return vote.getVoteId();
     }
