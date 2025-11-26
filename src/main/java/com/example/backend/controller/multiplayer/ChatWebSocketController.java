@@ -59,25 +59,47 @@ public class ChatWebSocketController {
             log.info("Action request from user {} in room {}", userId, roomId);
 
             Long voteId = voteService.startActionVote(roomId, userId);
-
-            ChatMessageResponse voteMessage = chatMessageService.sendSystemMessage(
-                    roomId,
-                    "행동하기 투표가 시작되었습니다",
-                    Map.of(
-                        "type", "vote_start",
-                        "voteId", voteId
-                    )
-            );
-
-            messagingTemplate.convertAndSend("/topic/room/" + roomId, voteMessage);
-
             RoomVoteResponse voteState = voteService.getVoteState(voteId);
-            ChatMessageResponse voteStateMessage = chatMessageService.sendVoteMessage(
-                    roomId,
-                    voteState,
-                    "vote_state"
-            );
-            messagingTemplate.convertAndSend("/topic/room/" + roomId, voteStateMessage);
+
+            // 1-2인 플레이: 자동 통과되었으므로 바로 LLM 호출
+            if (voteState.getStatus().equals("PASSED")) {
+                ChatMessageResponse passedMessage = chatMessageService.sendSystemMessage(
+                        roomId,
+                        "행동하기 투표가 자동 승인되었습니다",
+                        Map.of(
+                            "type", "vote_auto_passed",
+                            "voteId", voteId
+                        )
+                );
+                messagingTemplate.convertAndSend("/topic/room/" + roomId, passedMessage);
+
+                // AI 스토리 생성 시작
+                ChatMessageResponse thinkingMessage = chatMessageService.sendSystemMessage(
+                        roomId,
+                        "AI가 생각 중...",
+                        Map.of("type", "thinking")
+                );
+                messagingTemplate.convertAndSend("/topic/room/" + roomId, thinkingMessage);
+
+                llmIntegrationService.generateNextPhase(roomId)
+                        .thenAccept(llmResult -> log.info("LLM 응답 처리 완료: Room {}", roomId))
+                        .exceptionally(ex -> {
+                            log.error("LLM 응답 처리 실패: Room {}", roomId, ex);
+                            sendErrorToRoom(roomId, "AI 응답 생성에 실패했습니다");
+                            return null;
+                        });
+            } else {
+                // 3인 이상: 투표 시작 메시지만 전송
+                ChatMessageResponse voteMessage = chatMessageService.sendSystemMessage(
+                        roomId,
+                        "행동하기 투표가 시작되었습니다",
+                        Map.of(
+                            "type", "vote_start",
+                            "voteId", voteId
+                        )
+                );
+                messagingTemplate.convertAndSend("/topic/room/" + roomId, voteMessage);
+            }
         } catch (Exception e) {
             log.error("Error handling action in room {}: {}", roomId, e.getMessage());
             sendErrorToUser(headerAccessor, e.getMessage());
@@ -109,14 +131,6 @@ public class ChatWebSocketController {
             );
 
             messagingTemplate.convertAndSend("/topic/room/" + roomId, voteMessage);
-
-            RoomVoteResponse voteState = voteService.getVoteState(voteId);
-            ChatMessageResponse voteStateMessage = chatMessageService.sendVoteMessage(
-                    roomId,
-                    voteState,
-                    "vote_state"
-            );
-            messagingTemplate.convertAndSend("/topic/room/" + roomId, voteStateMessage);
         } catch (Exception e) {
             log.error("Error starting kick vote in room {}: {}", roomId, e.getMessage());
             sendErrorToUser(headerAccessor, e.getMessage());
@@ -138,15 +152,8 @@ public class ChatWebSocketController {
 
             VoteService.VoteResult result = voteService.submitBallot(voteId, vote, userId);
 
-            RoomVoteResponse voteState = voteService.getVoteState(voteId);
-            ChatMessageResponse voteStateMessage = chatMessageService.sendVoteMessage(
-                    roomId,
-                    voteState,
-                    "vote_state"
-            );
-            messagingTemplate.convertAndSend("/topic/room/" + roomId, voteStateMessage);
-
             if (result.getStatus() != com.example.backend.entity.multiplayer.VoteStatus.PENDING) {
+                RoomVoteResponse voteState = voteService.getVoteState(voteId);
                 String messageContent;
                 if (voteState.getVoteType().equals("KICK")) {
                     messageContent = result.getStatus() ==
