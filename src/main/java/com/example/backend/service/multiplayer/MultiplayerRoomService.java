@@ -4,12 +4,14 @@ import com.example.backend.dto.multiplayer.*;
 import com.example.backend.entity.*;
 import com.example.backend.entity.Station;
 import com.example.backend.entity.multiplayer.*;
+import com.example.backend.event.RoomCreatedEvent;
 import com.example.backend.exception.ResourceNotFoundException;
 import com.example.backend.repository.*;
 import com.example.backend.repository.multiplayer.*;
 import com.example.backend.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,7 +34,7 @@ public class MultiplayerRoomService {
     private final AuthService authService;
     private final ChatMessageService chatMessageService;
     private final VoteService voteService;
-    private final LlmIntegrationService llmIntegrationService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public RoomResponse createRoom(RoomCreateRequest request) {
@@ -88,14 +90,8 @@ public class MultiplayerRoomService {
 
         log.info("Room created: {} by user: {}", room.getRoomId(), currentUser.getUserId());
 
-        // 인트로 스토리 자동 생성 (비동기)
-        Long roomId = room.getRoomId();
-        llmIntegrationService.generateNextPhase(roomId)
-                .thenAccept(result -> log.info("인트로 스토리 생성 완료: Room {}", roomId))
-                .exceptionally(ex -> {
-                    log.error("인트로 스토리 생성 실패: Room {}", roomId, ex);
-                    return null;
-                });
+        // 트랜잭션 커밋 후 인트로 스토리 생성 이벤트 발행
+        eventPublisher.publishEvent(new RoomCreatedEvent(room.getRoomId()));
 
         return toRoomResponse(room);
     }
