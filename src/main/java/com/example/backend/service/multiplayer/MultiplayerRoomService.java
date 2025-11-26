@@ -32,6 +32,7 @@ public class MultiplayerRoomService {
     private final AuthService authService;
     private final ChatMessageService chatMessageService;
     private final VoteService voteService;
+    private final LlmIntegrationService llmIntegrationService;
 
     @Transactional
     public RoomResponse createRoom(RoomCreateRequest request) {
@@ -86,6 +87,15 @@ public class MultiplayerRoomService {
         statsRepository.save(stats);
 
         log.info("Room created: {} by user: {}", room.getRoomId(), currentUser.getUserId());
+
+        // 인트로 스토리 자동 생성 (비동기)
+        Long roomId = room.getRoomId();
+        llmIntegrationService.generateNextPhase(roomId)
+                .thenAccept(result -> log.info("인트로 스토리 생성 완료: Room {}", roomId))
+                .exceptionally(ex -> {
+                    log.error("인트로 스토리 생성 실패: Room {}", roomId, ex);
+                    return null;
+                });
 
         return toRoomResponse(room);
     }

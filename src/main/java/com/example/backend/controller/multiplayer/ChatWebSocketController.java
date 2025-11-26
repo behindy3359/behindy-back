@@ -73,14 +73,7 @@ public class ChatWebSocketController {
                 );
                 messagingTemplate.convertAndSend("/topic/room/" + roomId, passedMessage);
 
-                // AI 스토리 생성 시작
-                ChatMessageResponse thinkingMessage = chatMessageService.sendSystemMessage(
-                        roomId,
-                        "AI가 생각 중...",
-                        Map.of("type", "thinking")
-                );
-                messagingTemplate.convertAndSend("/topic/room/" + roomId, thinkingMessage);
-
+                // AI 스토리 생성 시작 (LlmIntegrationService에서 "AI가 생각 중..." 메시지 전송)
                 llmIntegrationService.generateNextPhase(roomId)
                         .thenAccept(llmResult -> log.info("LLM 응답 처리 완료: Room {}", roomId))
                         .exceptionally(ex -> {
@@ -180,13 +173,7 @@ public class ChatWebSocketController {
                 if (voteState.getVoteType().equals("ACTION") &&
                     result.getStatus() == com.example.backend.entity.multiplayer.VoteStatus.PASSED) {
 
-                    ChatMessageResponse thinkingMessage = chatMessageService.sendSystemMessage(
-                            roomId,
-                            "AI가 생각 중...",
-                            Map.of("type", "thinking")
-                    );
-                    messagingTemplate.convertAndSend("/topic/room/" + roomId, thinkingMessage);
-
+                    // AI 스토리 생성 시작 (LlmIntegrationService에서 "AI가 생각 중..." 메시지 전송)
                     llmIntegrationService.generateNextPhase(roomId)
                             .thenAccept(llmResult -> log.info("LLM 응답 처리 완료: Room {}", roomId))
                             .exceptionally(ex -> {
