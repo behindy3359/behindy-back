@@ -205,16 +205,36 @@ public class LlmIntegrationService {
 
     @Transactional
     protected void saveStoryState(MultiplayerRoom room, LlmStoryResponse response) {
+        // 구조화된 스토리를 하나의 텍스트로 결합
+        String combinedStory = formatStoryContent(response.getStory());
+
         MultiplayerStoryState state = MultiplayerStoryState.builder()
                 .room(room)
                 .phase(response.getPhase())
-                .llmResponse(response.getStoryText())
+                .llmResponse(combinedStory)
                 .summary(room.getStoryOutline())
                 .context(new HashMap<>())
                 .build();
 
         storyStateRepository.save(state);
         log.info("스토리 상태 저장 완료: Room {} Phase {}", room.getRoomId(), response.getPhase());
+    }
+
+    private String formatStoryContent(LlmStoryResponse.StoryContent story) {
+        if (story == null) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        if (story.getCurrentSituation() != null) {
+            sb.append(story.getCurrentSituation()).append("\n\n");
+        }
+        if (story.getSpecialEvent() != null) {
+            sb.append(story.getSpecialEvent()).append("\n\n");
+        }
+        if (story.getHint() != null) {
+            sb.append(story.getHint());
+        }
+        return sb.toString().trim();
     }
 
     @Transactional
@@ -236,29 +256,59 @@ public class LlmIntegrationService {
             String characterName = participant.getCharacter().getCharName();
             CharacterEffect effect = effectMap.get(characterName);
             if (effect != null) {
-                if (effect.getHpChange() != 0) {
+                // 변화량이 0이 아닌 경우에만 처리
+                boolean hasHpChange = effect.getHpChange() != null && effect.getHpChange() != 0;
+                boolean hasSanityChange = effect.getSanityChange() != null && effect.getSanityChange() != 0;
+
+                if (hasHpChange) {
                     int newHp = Math.max(0, Math.min(100, participant.getHp() + effect.getHpChange()));
                     participant.setHp(newHp);
                 }
-                if (effect.getSanityChange() != 0) {
+                if (hasSanityChange) {
                     int newSanity = Math.max(0, Math.min(100, participant.getSanity() + effect.getSanityChange()));
                     participant.setSanity(newSanity);
                 }
 
-                participantRepository.save(participant);
+                if (hasHpChange || hasSanityChange) {
+                    participantRepository.save(participant);
 
-                log.info("참여자 상태 업데이트: {} HP:{}{} Sanity:{}{}",
-                        characterName,
-                        participant.getHp(),
-                        effect.getHpChange() > 0 ? "+" + effect.getHpChange() : effect.getHpChange(),
-                        participant.getSanity(),
-                        effect.getSanityChange() > 0 ? "+" + effect.getSanityChange() : effect.getSanityChange()
-                );
+                    log.info("참여자 상태 업데이트: {} HP:{}{} Sanity:{}{}",
+                            characterName,
+                            participant.getHp(),
+                            hasHpChange ? (effect.getHpChange() > 0 ? "+" + effect.getHpChange() : effect.getHpChange()) : "",
+                            participant.getSanity(),
+                            hasSanityChange ? (effect.getSanityChange() > 0 ? "+" + effect.getSanityChange() : effect.getSanityChange()) : ""
+                    );
 
-                if (participant.getHp() <= 0) {
+                    // 시스템 메시지 생성 (0이 아닌 경우만)
+                    sendStatChangeMessages(participant.getRoom().getRoomId(), characterName, effect);
+                }
+
+                // 사망 체크
+                if (participant.getHp() <= 0 || participant.getSanity() <= 0) {
                     handleParticipantDeath(participant);
                 }
             }
+        }
+    }
+
+    private void sendStatChangeMessages(Long roomId, String characterName, CharacterEffect effect) {
+        if (effect.getHpChange() != null && effect.getHpChange() != 0) {
+            String sign = effect.getHpChange() > 0 ? "+" : "";
+            String message = String.format("%s에게 %s%d의 체력 영향", characterName, sign, effect.getHpChange());
+            ChatMessageResponse sysMsg = chatMessageService.sendSystemMessage(
+                    roomId, message, Map.of("type", "stat_change")
+            );
+            messagingTemplate.convertAndSend("/topic/room/" + roomId, sysMsg);
+        }
+
+        if (effect.getSanityChange() != null && effect.getSanityChange() != 0) {
+            String sign = effect.getSanityChange() > 0 ? "+" : "";
+            String message = String.format("%s에게 %s%d의 정신력 영향", characterName, sign, effect.getSanityChange());
+            ChatMessageResponse sysMsg = chatMessageService.sendSystemMessage(
+                    roomId, message, Map.of("type", "stat_change")
+            );
+            messagingTemplate.convertAndSend("/topic/room/" + roomId, sysMsg);
         }
     }
 
@@ -286,9 +336,12 @@ public class LlmIntegrationService {
     }
 
     private void broadcastLlmResponse(Long roomId, LlmStoryResponse response) {
+        // 구조화된 스토리를 하나의 텍스트로 결합
+        String combinedStory = formatStoryContent(response.getStory());
+
         ChatMessageResponse storyMessage = chatMessageService.sendLlmMessage(
                 roomId,
-                response.getStoryText(),
+                combinedStory,
                 response.getPhase()
         );
 
