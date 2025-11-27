@@ -23,4 +23,11 @@ public interface MultiplayerStoryStateRepository extends JpaRepository<Multiplay
 
     @Query("SELECT COUNT(s) FROM MultiplayerStoryState s WHERE s.room.roomId = :roomId")
     long countByRoomId(@Param("roomId") Long roomId);
+
+    @Query("SELECT s FROM MultiplayerStoryState s WHERE s.room.roomId = :roomId AND s.phase BETWEEN :startPhase AND :endPhase ORDER BY s.phase ASC")
+    List<MultiplayerStoryState> findByRoom_RoomIdAndPhaseBetweenOrderByPhaseAsc(
+            @Param("roomId") Long roomId,
+            @Param("startPhase") Integer startPhase,
+            @Param("endPhase") Integer endPhase
+    );
 }

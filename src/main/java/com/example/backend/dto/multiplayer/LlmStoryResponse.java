@@ -17,6 +17,8 @@ public class LlmStoryResponse {
     private Integer phase;
     private Boolean isEnding;
     private String storyOutline;
+    private String phaseSummary;      // 이번 Phase 요약 (다음 요청에 포함)
+    private String endingSummary;     // 엔딩 시 전체 스토리 요약
 
     @Getter
     @NoArgsConstructor

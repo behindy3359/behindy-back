@@ -107,6 +107,22 @@ public class LlmIntegrationService {
         return messages;
     }
 
+    private List<StoryHistoryItem> getStoryHistory(Long roomId, Integer currentPhase) {
+        // 최근 5개 Phase의 요약만 조회 (토큰 제한 고려)
+        int startPhase = Math.max(1, currentPhase - 4);
+
+        List<MultiplayerStoryState> storyStates = storyStateRepository
+                .findByRoom_RoomIdAndPhaseBetweenOrderByPhaseAsc(roomId, startPhase, currentPhase - 1);
+
+        return storyStates.stream()
+                .filter(state -> state.getSummary() != null && !state.getSummary().isEmpty())
+                .map(state -> StoryHistoryItem.builder()
+                        .phase(state.getPhase())
+                        .summary(state.getSummary())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
     private LlmStoryRequest buildLlmRequest(MultiplayerRoom room,
                                             List<RoomParticipant> participants,
                                             List<ChatMessage> messages,
@@ -135,6 +151,10 @@ public class LlmIntegrationService {
                         .build())
                 .collect(Collectors.toList());
 
+        // 스토리 히스토리 조회 (인트로가 아닐 때만)
+        List<StoryHistoryItem> storyHistory = isIntro ? Collections.emptyList() :
+                getStoryHistory(room.getRoomId(), room.getCurrentPhase());
+
         return LlmStoryRequest.builder()
                 .roomId(room.getRoomId())
                 .phase(room.getCurrentPhase())
@@ -142,6 +162,7 @@ public class LlmIntegrationService {
                 .storyOutline(room.getStoryOutline())
                 .participants(participantContexts)
                 .messageStack(messageStack)
+                .storyHistory(storyHistory)
                 .isIntro(isIntro)
                 .build();
     }
@@ -178,6 +199,11 @@ public class LlmIntegrationService {
             if (response.getIsEnding()) {
                 room.finish();
                 log.info("스토리 종료: Room {}", room.getRoomId());
+
+                // 엔딩 메시지 브로드캐스트
+                if (response.getEndingSummary() != null) {
+                    broadcastEndingMessage(room.getRoomId(), response.getEndingSummary());
+                }
             }
 
             room.setIsLlmProcessing(false);
@@ -208,16 +234,23 @@ public class LlmIntegrationService {
         // 구조화된 스토리를 하나의 텍스트로 결합
         String combinedStory = formatStoryContent(response.getStory());
 
+        // context에 endingSummary 저장 (엔딩일 때만)
+        Map<String, Object> context = new HashMap<>();
+        if (response.getIsEnding() && response.getEndingSummary() != null) {
+            context.put("ending_summary", response.getEndingSummary());
+        }
+
         MultiplayerStoryState state = MultiplayerStoryState.builder()
                 .room(room)
                 .phase(response.getPhase())
                 .llmResponse(combinedStory)
-                .summary(room.getStoryOutline())
-                .context(new HashMap<>())
+                .summary(response.getPhaseSummary())  // phase_summary 저장
+                .context(context)
                 .build();
 
         storyStateRepository.save(state);
-        log.info("스토리 상태 저장 완료: Room {} Phase {}", room.getRoomId(), response.getPhase());
+        log.info("스토리 상태 저장 완료: Room {} Phase {} Summary: {}",
+            room.getRoomId(), response.getPhase(), response.getPhaseSummary());
     }
 
     private String formatStoryContent(LlmStoryResponse.StoryContent story) {
@@ -384,6 +417,20 @@ public class LlmIntegrationService {
             messagingTemplate.convertAndSend("/topic/room/" + roomId, errorMsg);
         } catch (Exception e) {
             log.error("에러 메시지 브로드캐스트 실패: Room {}", roomId, e);
+        }
+    }
+
+    private void broadcastEndingMessage(Long roomId, String endingSummary) {
+        try {
+            ChatMessageResponse endingMsg = chatMessageService.sendSystemMessage(
+                    roomId,
+                    endingSummary,
+                    Map.of("type", "ending", "ending_summary", endingSummary)
+            );
+            messagingTemplate.convertAndSend("/topic/room/" + roomId, endingMsg);
+            log.info("엔딩 메시지 브로드캐스트: Room {}", roomId);
+        } catch (Exception e) {
+            log.error("엔딩 메시지 브로드캐스트 실패: Room {}", roomId, e);
         }
     }
 }
