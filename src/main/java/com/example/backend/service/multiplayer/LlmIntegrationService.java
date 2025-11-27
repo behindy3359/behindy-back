@@ -362,7 +362,7 @@ public class LlmIntegrationService {
     private void sendAiThinkingMessage(Long roomId) {
         ChatMessageResponse thinkingMsg = chatMessageService.sendSystemMessage(
                 roomId,
-                "AI가 생각 중...",
+                "어둠 속에서 웅성거리는 소리가 들립니다...",
                 Map.of("type", "llm_thinking")
         );
         messagingTemplate.convertAndSend("/topic/room/" + roomId, thinkingMsg);
