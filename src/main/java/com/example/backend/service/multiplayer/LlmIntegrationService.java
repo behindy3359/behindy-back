@@ -386,13 +386,16 @@ public class LlmIntegrationService {
         Map<String, Object> updates = new HashMap<>();
         updates.put("type", "participant_update");
         updates.put("participants", participants.stream()
-            .map(p -> Map.of(
-                "participantId", p.getParticipantId(),
-                "characterName", p.getCharacter().getCharName(),
-                "hp", p.getHp(),
-                "sanity", p.getSanity(),
-                "isActive", p.isActive()
-            ))
+            .map(p -> {
+                Map<String, Object> participantMap = new HashMap<>();
+                participantMap.put("participantId", p.getParticipantId());
+                participantMap.put("userId", p.getUser().getUserId());
+                participantMap.put("characterName", p.getCharacter().getCharName());
+                participantMap.put("hp", p.getHp());
+                participantMap.put("sanity", p.getSanity());
+                participantMap.put("isActive", p.isActive());
+                return participantMap;
+            })
             .collect(Collectors.toList()));
 
         messagingTemplate.convertAndSend("/topic/room/" + roomId + "/participants", updates);
