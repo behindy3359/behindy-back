@@ -79,4 +79,103 @@ public class SecurityConfig {
         configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
+
+    @Bean
+    public CookieCsrfTokenRepository cookieCsrfTokenRepository() {
+        CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        repository.setCookieName("XSRF-TOKEN");
+        repository.setHeaderName("X-XSRF-TOKEN");
+        repository.setCookiePath("/");
+        repository.setCookieHttpOnly(false);
+        repository.setCookieMaxAge((int) java.time.Duration.ofHours(1).toSeconds());
+        return repository;
+    }
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http,
+                                           CookieCsrfTokenRepository cookieCsrfTokenRepository) throws Exception {
+        CsrfTokenRequestAttributeHandler requestHandler = new CsrfTokenRequestAttributeHandler();
+        requestHandler.setCsrfRequestAttributeName("_csrf");
+        CsrfTokenRepository safeRepository = new SafeCookieCsrfTokenRepository(cookieCsrfTokenRepository);
+
+        http
+                .csrf(csrf -> csrf
+                        .csrfTokenRepository(safeRepository)
+                        .csrfTokenRequestHandler(requestHandler)
+                        .ignoringRequestMatchers(
+                                "/api/auth/**",
+                                "/api/public/**",
+                                "/api/metro/**",
+                                "/test/**",
+                                "/error",
+                                "/",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/v3/api-docs/**",
+                                "/swagger-resources/**",
+                                "/webjars/**",
+                                "/api/ai-stories/internal/**",
+                                "/ws/**",
+                                "/api/posts",
+                                "/api/posts/**",
+                                "/api/comments/**",
+                                "/api/stories/**",
+                                "/api/ai-stories/health"
+                        )
+                )
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/v3/api-docs/**",
+                                "/swagger-resources/**",
+                                "/webjars/**"
+                        ).permitAll()
+
+                        .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/public/**").permitAll()
+                        .requestMatchers("/api/metro/**").permitAll()
+                        .requestMatchers("/test/**").permitAll()
+                        .requestMatchers("/error").permitAll()
+                        .requestMatchers("/").permitAll()
+
+                        .requestMatchers("/ws/**").permitAll()
+
+                        .requestMatchers(HttpMethod.GET, "/api/posts").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/posts/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/comments/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/stories/**").permitAll()
+
+                        .requestMatchers("/api/ai-stories/internal/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/security/csrf-token").permitAll()
+
+                        .requestMatchers(HttpMethod.GET, "/api/ai-stories/health").permitAll()
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                        .requestMatchers(HttpMethod.POST, "/api/posts").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/api/posts/**").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/posts/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/comments").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/api/comments/**").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/comments/**").authenticated()
+                        .requestMatchers("/api/characters/**").authenticated()
+                        .requestMatchers("/api/game/**").authenticated()
+                        .requestMatchers("/api/ai-stories/**").authenticated()
+                        .anyRequest().authenticated()
+                );
+
+        http.authenticationProvider(authenticationProvider());
+
+        http.addFilterBefore(csrfDebugLoggingFilter, CsrfFilter.class);
+        http.addFilterBefore(internalApiKeyFilter, UsernamePasswordAuthenticationFilter.class);
+        http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+}
