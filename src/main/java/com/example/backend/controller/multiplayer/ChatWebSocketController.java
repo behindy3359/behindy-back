@@ -38,7 +38,6 @@ public class ChatWebSocketController {
 
         try {
             Long userId = getUserIdFromSession(headerAccessor);
-            log.debug("Chat message from user {} in room {}", userId, roomId);
 
             ChatMessageResponse response = chatMessageService.sendMessage(roomId, request, userId);
 
@@ -56,12 +55,10 @@ public class ChatWebSocketController {
 
         try {
             Long userId = getUserIdFromSession(headerAccessor);
-            log.info("Action request from user {} in room {}", userId, roomId);
 
             Long voteId = voteService.startActionVote(roomId, userId);
             RoomVoteResponse voteState = voteService.getVoteState(voteId);
 
-            // 1-2인 플레이: 자동 통과되었으므로 바로 LLM 호출
             if (voteState.getStatus().equals("PASSED")) {
                 ChatMessageResponse passedMessage = chatMessageService.sendSystemMessage(
                         roomId,
@@ -73,7 +70,6 @@ public class ChatWebSocketController {
                 );
                 messagingTemplate.convertAndSend("/topic/room/" + roomId, passedMessage);
 
-                // AI 스토리 생성 시작 (LlmIntegrationService에서 "AI가 생각 중..." 메시지 전송)
                 llmIntegrationService.generateNextPhase(roomId)
                         .thenAccept(llmResult -> log.info("LLM 응답 처리 완료: Room {}", roomId))
                         .exceptionally(ex -> {
@@ -82,7 +78,6 @@ public class ChatWebSocketController {
                             return null;
                         });
             } else {
-                // 3인 이상: 투표 시작 메시지만 전송
                 ChatMessageResponse voteMessage = chatMessageService.sendSystemMessage(
                         roomId,
                         "행동하기 투표가 시작되었습니다",
@@ -108,8 +103,6 @@ public class ChatWebSocketController {
         try {
             Long userId = getUserIdFromSession(headerAccessor);
             Long targetUserId = payload.get("targetUserId");
-
-            log.info("Kick vote started by user {} for user {} in room {}", userId, targetUserId, roomId);
 
             Long voteId = voteService.startKickVote(roomId, targetUserId, userId);
 
@@ -141,8 +134,6 @@ public class ChatWebSocketController {
             Long userId = getUserIdFromSession(headerAccessor);
             Boolean vote = payload.get("vote");
 
-            log.debug("User {} submitted ballot for vote {} in room {}", userId, voteId, roomId);
-
             VoteService.VoteResult result = voteService.submitBallot(voteId, vote, userId);
 
             if (result.getStatus() != com.example.backend.entity.multiplayer.VoteStatus.PENDING) {
@@ -173,7 +164,6 @@ public class ChatWebSocketController {
                 if (voteState.getVoteType().equals("ACTION") &&
                     result.getStatus() == com.example.backend.entity.multiplayer.VoteStatus.PASSED) {
 
-                    // AI 스토리 생성 시작 (LlmIntegrationService에서 "AI가 생각 중..." 메시지 전송)
                     llmIntegrationService.generateNextPhase(roomId)
                             .thenAccept(llmResult -> log.info("LLM 응답 처리 완료: Room {}", roomId))
                             .exceptionally(ex -> {

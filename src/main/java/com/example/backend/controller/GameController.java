@@ -332,8 +332,6 @@ public class GameController {
         return ResponseEntity.ok(response);
     }
 
-    // === 관리자용 API ===
-
     @Operation(summary = "[관리자] 진행 중인 모든 게임 세션 조회", description = "시스템에서 현재 진행 중인 모든 게임 세션을 조회합니다. 관리자 권한이 필요합니다.")
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "세션 목록 조회 성공"),

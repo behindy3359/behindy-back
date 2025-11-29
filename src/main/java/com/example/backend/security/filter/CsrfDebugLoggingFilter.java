@@ -26,19 +26,6 @@ public class CsrfDebugLoggingFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
 
-        if (METHODS.contains(request.getMethod())) {
-            String headerToken = request.getHeader("X-XSRF-TOKEN");
-            Cookie cookie = WebUtils.getCookie(request, "XSRF-TOKEN");
-            String cookieToken = cookie != null ? cookie.getValue() : null;
-
-            log.info("[CSRF] {} {} headerPresent={} cookiePresent={} cookieValueSnippet={}",
-                    request.getMethod(),
-                    request.getRequestURI(),
-                    headerToken != null,
-                    cookieToken != null,
-                    cookieToken != null && cookieToken.length() > 8 ? cookieToken.substring(0, 8) + "..." : cookieToken);
-        }
-
         filterChain.doFilter(request, response);
     }
 }

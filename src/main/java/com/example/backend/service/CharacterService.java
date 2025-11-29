@@ -104,7 +104,6 @@ public class CharacterService {
         return Optional.of(entityDtoMapper.toCharacterResponse(character));
     }
 
-
     @Transactional(readOnly = true)
     public CharacterGameStatusResponse getCharacterGameStatus() {
         User currentUser = authService.getCurrentUser();
@@ -115,7 +114,6 @@ public class CharacterService {
         boolean isDying = isAlive && (character.getCharHealth() <= 20 || character.getCharSanity() <= 20);
         String statusMessage = getCharacterStatusMessage(character);
 
-        // 게임 진행 상태 확인
         Optional<Now> activeGame = nowRepository.findByCharacterIdWithPage(character.getCharId());
         boolean hasActiveGame = activeGame.isPresent();
 
@@ -137,12 +135,10 @@ public class CharacterService {
             }
         }
 
-        // 캐릭터 통계 조회
         Long totalClears = logERepository.countCompletionsByCharacter(character.getCharId());
         Long totalPlays = logERepository.countTotalPlaysByCharacter(character.getCharId());
         Double clearRate = totalPlays > 0 ? (double) totalClears / totalPlays * 100 : 0.0;
 
-        // 새 게임 진입 가능 여부
         boolean canEnterNewGame = isAlive && !hasActiveGame && character.getCharHealth() > 0 && character.getCharSanity() > 0;
         String cannotEnterReason = null;
 

@@ -32,7 +32,6 @@ public class WebClientConfig {
     @Value("${behindy.internal.api-key:behindy-internal-2025-secret-key}")
     private String internalApiKey;
 
-
     @Bean("metroWebClient")
     public WebClient webClient() {
         HttpClient httpClient = HttpClient.create()

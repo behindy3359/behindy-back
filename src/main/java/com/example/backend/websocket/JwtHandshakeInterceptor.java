@@ -43,15 +43,12 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
                 Long userId = jwtTokenProvider.getUserIdFromJWT(token);
                 attributes.put("userId", userId);
 
-                log.info("WebSocket handshake successful for user: {}", userId);
                 return true;
             } else {
-                log.warn("WebSocket handshake failed: Invalid or missing token");
                 return false;
             }
         }
 
-        log.warn("WebSocket handshake failed: Not a servlet request");
         return false;
     }
 

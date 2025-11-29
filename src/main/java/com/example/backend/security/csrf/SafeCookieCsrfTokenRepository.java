@@ -7,10 +7,6 @@ import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.util.StringUtils;
 
-/**
- * Wrapper that keeps the issued CSRF cookie when Spring Security attempts to clear it
- * for safe HTTP methods (GET/HEAD/OPTIONS/TRACE).
- */
 public class SafeCookieCsrfTokenRepository implements CsrfTokenRepository {
 
     private final CookieCsrfTokenRepository delegate;

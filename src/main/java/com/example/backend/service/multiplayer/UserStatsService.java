@@ -56,8 +56,6 @@ public class UserStatsService {
 
         stats.incrementCompletions();
         statsRepository.save(stats);
-
-        log.debug("User {} completion count incremented", userId);
     }
 
     @Transactional
@@ -67,8 +65,6 @@ public class UserStatsService {
 
         stats.incrementDeaths();
         statsRepository.save(stats);
-
-        log.debug("User {} death count incremented", userId);
     }
 
     @Transactional
@@ -78,8 +74,6 @@ public class UserStatsService {
 
         stats.incrementKicks();
         statsRepository.save(stats);
-
-        log.debug("User {} kick count incremented", userId);
     }
 
     private UserStatsResponse toStatsResponse(UserStoryStats stats) {

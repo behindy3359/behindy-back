@@ -72,8 +72,6 @@ public class VoteService {
 
         vote = voteRepository.save(vote);
 
-        log.info("Kick vote started in room {} for user {}", roomId, targetUserId);
-
         return vote.getVoteId();
     }
 
@@ -97,7 +95,6 @@ public class VoteService {
 
         long activeParticipants = participantRepository.countActiveParticipantsByRoomId(roomId);
 
-        // 혼자 플레이하는 경우 즉시 통과
         if (activeParticipants == 1) {
             LocalDateTime now = LocalDateTime.now();
             RoomVote vote = RoomVote.builder()
@@ -105,13 +102,12 @@ public class VoteService {
                     .voteType(VoteType.ACTION)
                     .targetUser(null)
                     .initiatedBy(currentUser)
-                    .status(VoteStatus.PASSED)  // 즉시 통과
+                    .status(VoteStatus.PASSED)
                     .expiresAt(now)
                     .build();
 
             vote = voteRepository.save(vote);
 
-            // 자동으로 찬성표 제출
             VoteBallot ballot = VoteBallot.builder()
                     .roomVote(vote)
                     .user(currentUser)
@@ -119,7 +115,6 @@ public class VoteService {
                     .build();
             ballotRepository.save(ballot);
 
-            log.info("Action vote auto-passed for solo player in room {}", roomId);
             return vote.getVoteId();
         }
 
@@ -136,7 +131,6 @@ public class VoteService {
 
         vote = voteRepository.save(vote);
 
-        // 투표를 시작한 사람은 자동으로 찬성
         VoteBallot initiatorBallot = VoteBallot.builder()
                 .roomVote(vote)
                 .user(currentUser)
@@ -144,13 +138,9 @@ public class VoteService {
                 .build();
         ballotRepository.save(initiatorBallot);
 
-        log.info("Action vote started in room {} by user {} (auto-voted yes)", roomId, userId);
-
-        // 2인 플레이에서 한 명이 찬성하면 과반수이므로 즉시 통과
         if (activeParticipants == 2) {
             vote.pass();
             voteRepository.save(vote);
-            log.info("Action vote auto-passed for 2-player room {}", roomId);
         }
 
         return vote.getVoteId();
@@ -234,16 +224,10 @@ public class VoteService {
                             .orElseThrow();
                     targetParticipant.leave();
                     participantRepository.save(targetParticipant);
-
-                    log.info("Vote {} passed - user {} kicked from room {}",
-                        voteId, vote.getTargetUser().getUserId(), vote.getRoom().getRoomId());
-                } else {
-                    log.info("Vote {} passed - action approved", voteId);
                 }
             } else {
                 vote.fail();
                 result.setStatus(VoteStatus.FAILED);
-                log.info("Vote {} failed", voteId);
             }
 
             voteRepository.save(vote);
@@ -262,7 +246,6 @@ public class VoteService {
             if (vote.getStatus() == VoteStatus.PENDING) {
                 vote.expire();
                 voteRepository.save(vote);
-                log.info("Vote {} expired", vote.getVoteId());
             }
         }
     }

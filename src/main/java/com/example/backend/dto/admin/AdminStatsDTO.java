@@ -36,7 +36,6 @@ public class AdminStatsDTO {
     private LocalDateTime serverTime;
     private String serverStatus;
 
-
     public void setHealthyStatus() {
         this.serverStatus = "HEALTHY";
     }

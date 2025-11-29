@@ -332,11 +332,9 @@ public class AuthController {
     @GetMapping("/status")
     public ResponseEntity<ApiResponse> checkAuthStatus(HttpServletRequest request) {
         try {
-            // Access Token은 Authorization 헤더에서 확인
             String authHeader = request.getHeader("Authorization");
             boolean hasAccessToken = authHeader != null && authHeader.startsWith("Bearer ");
 
-            // Refresh Token은 Cookie에서 확인
             boolean hasRefreshToken = request.getCookies() != null &&
                     Arrays.stream(request.getCookies())
                             .anyMatch(cookie -> "refreshToken".equals(cookie.getName()));

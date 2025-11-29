@@ -24,7 +24,6 @@ public class AdminController {
 
     private final AdminService adminService;
 
-
     @GetMapping("/stats")
     public ResponseEntity<?> getStats(@AuthenticationPrincipal User user) {
         if (!adminService.isAdmin(user)) {
@@ -56,7 +55,6 @@ public class AdminController {
 
         return ResponseEntity.ok(users);
     }
-
 
     @GetMapping("/users/recent")
     public ResponseEntity<?> getRecentActiveUsers(@AuthenticationPrincipal User user) {

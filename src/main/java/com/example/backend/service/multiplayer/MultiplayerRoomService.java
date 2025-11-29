@@ -56,8 +56,6 @@ public class MultiplayerRoomService {
         List<RoomParticipant> activeParticipations = participantRepository
                 .findActiveParticipantsByUserId(currentUser.getUserId());
         if (!activeParticipations.isEmpty()) {
-            log.info("User {} has active participations, leaving {} rooms before creating new room",
-                currentUser.getUserId(), activeParticipations.size());
             leaveAllActiveRooms(currentUser);
         }
 
@@ -83,14 +81,12 @@ public class MultiplayerRoomService {
 
         participantRepository.save(participant);
 
-        // Pessimistic Lock으로 동시성 충돌 방지
         UserStoryStats stats = getOrCreateUserStats(currentUser);
         stats.incrementParticipations();
         statsRepository.save(stats);
 
         log.info("Room created: {} by user: {}", room.getRoomId(), currentUser.getUserId());
 
-        // 트랜잭션 커밋 후 인트로 스토리 생성 이벤트 발행
         eventPublisher.publishEvent(new RoomCreatedEvent(room.getRoomId()));
 
         return toRoomResponse(room);
@@ -131,8 +127,6 @@ public class MultiplayerRoomService {
         List<RoomParticipant> activeParticipations = participantRepository
                 .findActiveParticipantsByUserId(currentUser.getUserId());
         if (!activeParticipations.isEmpty()) {
-            log.info("User {} has active participations, leaving {} rooms before joining room {}",
-                currentUser.getUserId(), activeParticipations.size(), roomId);
             leaveAllActiveRooms(currentUser);
         }
 
@@ -147,12 +141,9 @@ public class MultiplayerRoomService {
 
         participantRepository.save(participant);
 
-        // Pessimistic Lock으로 동시성 충돌 방지
         UserStoryStats stats = getOrCreateUserStats(currentUser);
         stats.incrementParticipations();
         statsRepository.save(stats);
-
-        log.info("User {} joined room {}", currentUser.getUserId(), roomId);
 
         return toRoomResponse(room);
     }
@@ -181,12 +172,8 @@ public class MultiplayerRoomService {
             if (!activeParticipants.isEmpty()) {
                 room.setOwner(activeParticipants.get(0).getUser());
                 roomRepository.save(room);
-                log.info("Room {} owner transferred to user {}",
-                    roomId, activeParticipants.get(0).getUser().getUserId());
             }
         }
-
-        log.info("User {} left room {}", currentUser.getUserId(), roomId);
     }
 
     @Transactional(readOnly = true)
@@ -276,10 +263,6 @@ public class MultiplayerRoomService {
                 .build();
     }
 
-    /**
-     * 사용자가 참가 중인 모든 활성 방에서 퇴장합니다.
-     * 새 방 생성이나 참가 전에 자동으로 호출됩니다.
-     */
     private void leaveAllActiveRooms(User user) {
         List<RoomParticipant> activeParticipations = participantRepository
                 .findActiveParticipantsByUserId(user.getUserId());
@@ -302,12 +285,8 @@ public class MultiplayerRoomService {
                     if (!remainingParticipants.isEmpty()) {
                         room.setOwner(remainingParticipants.get(0).getUser());
                         roomRepository.save(room);
-                        log.info("Room {} owner transferred to user {} during auto-exit",
-                            room.getRoomId(), remainingParticipants.get(0).getUser().getUserId());
                     }
                 }
-
-                log.info("User {} automatically left room {}", user.getUserId(), room.getRoomId());
             } catch (Exception e) {
                 log.error("Failed to auto-leave room {} for user {}",
                     participant.getRoom().getRoomId(), user.getUserId(), e);
@@ -315,10 +294,6 @@ public class MultiplayerRoomService {
         }
     }
 
-    /**
-     * UserStoryStats를 조회하거나 생성합니다.
-     * 동시성 충돌 시 재시도합니다 (최대 3회).
-     */
     private UserStoryStats getOrCreateUserStats(User user) {
         int maxRetries = 3;
         int attempt = 0;
@@ -327,7 +302,6 @@ public class MultiplayerRoomService {
             try {
                 return statsRepository.findByUserIdForUpdate(user.getUserId())
                         .orElseGet(() -> {
-                            // @MapsId 사용 시 user만 설정, userId는 자동 할당
                             UserStoryStats newStats = UserStoryStats.builder()
                                     .user(user)
                                     .build();
@@ -341,10 +315,8 @@ public class MultiplayerRoomService {
                             maxRetries, user.getUserId(), e);
                     throw e;
                 }
-                log.warn("Concurrent modification detected for UserStoryStats (user: {}), retrying... (attempt {}/{})",
-                        user.getUserId(), attempt, maxRetries);
                 try {
-                    Thread.sleep(50 * attempt); // Exponential backoff: 50ms, 100ms, 150ms
+                    Thread.sleep(50 * attempt);
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
                     throw new RuntimeException("Thread interrupted during retry", ie);

@@ -36,7 +36,7 @@ public class VoteBallot {
     private User user;
 
     @Column(name = "vote", nullable = false)
-    private Boolean vote;  // true: 찬성, false: 반대
+    private Boolean vote;
 
     @CreatedDate
     @Column(name = "created_at", updatable = false)

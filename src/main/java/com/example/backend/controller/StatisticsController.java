@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.util.List;
 
-
 @Slf4j
 @RestController
 @RequestMapping("/api/statistics")
@@ -28,7 +27,6 @@ public class StatisticsController {
         OverallSummaryResponse summary = statisticsService.getOverallSummary();
         return ResponseEntity.ok(summary);
     }
-
 
     @GetMapping("/daily")
     public ResponseEntity<DailyStatisticsResponse> getDailyStatistics(

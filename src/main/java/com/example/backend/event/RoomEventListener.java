@@ -17,10 +17,8 @@ public class RoomEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleRoomCreated(RoomCreatedEvent event) {
         Long roomId = event.getRoomId();
-        log.info("방 생성 완료, 인트로 스토리 생성 시작: Room {}", roomId);
 
         llmIntegrationService.generateNextPhase(roomId)
-                .thenAccept(result -> log.info("인트로 스토리 생성 완료: Room {}", roomId))
                 .exceptionally(ex -> {
                     log.error("인트로 스토리 생성 실패: Room {}", roomId, ex);
                     return null;

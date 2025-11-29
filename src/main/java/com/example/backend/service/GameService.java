@@ -1,4 +1,3 @@
-// GameService.java
 package com.example.backend.service;
 
 import com.example.backend.dto.character.CharacterResponse;
@@ -376,7 +375,6 @@ public class GameService {
                 .message("축하합니다! 스토리를 완료했습니다.")
                 .build();
     }
-
 
     private Character getAliveCharacter(User user) {
         return characterRepository.findByUserAndDeletedAtIsNull(user)

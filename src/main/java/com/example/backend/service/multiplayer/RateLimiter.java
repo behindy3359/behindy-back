@@ -24,7 +24,6 @@ public class RateLimiter {
         if (lastTimeStr != null) {
             long lastTime = Long.parseLong(lastTimeStr);
             if (now - lastTime < MESSAGE_INTERVAL_MS) {
-                log.debug("Rate limit exceeded for user {}", userId);
                 return false;
             }
         }

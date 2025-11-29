@@ -62,8 +62,6 @@ public class ChatMessageService {
 
         message = messageRepository.save(message);
 
-        log.debug("User {} sent message in room {}", userId, roomId);
-
         return toMessageResponse(message);
     }
 
@@ -81,8 +79,6 @@ public class ChatMessageService {
                 .build();
 
         message = messageRepository.save(message);
-
-        log.debug("System message sent in room {}: {}", roomId, content);
 
         return toMessageResponse(message);
     }
@@ -124,8 +120,6 @@ public class ChatMessageService {
 
         message = messageRepository.save(message);
 
-        log.debug("Phase message sent in room {}: phase {}", roomId, phase);
-
         return toMessageResponse(message);
     }
 
@@ -158,8 +152,6 @@ public class ChatMessageService {
                 .build();
 
         message = messageRepository.save(message);
-
-        log.debug("Vote message sent in room {}: {}", roomId, metadata);
 
         return toMessageResponse(message);
     }

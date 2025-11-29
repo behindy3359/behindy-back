@@ -18,7 +18,6 @@ import java.util.Map;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
 
-
 @Tag(name = "지하철 API", description = "서울시 실시간 지하철 위치 정보 조회 API (Open API 연동)")
 @Slf4j
 @RestController
@@ -30,7 +29,6 @@ public class MetroController {
     private final MetroCacheService metroCacheService;
     private final MetroStationFilter stationFilter;
     private final MetroDataScheduler dataScheduler;
-
 
     @GetMapping("/positions")
     public ResponseEntity<ApiResponse> getAllPositions() {
@@ -129,7 +127,6 @@ public class MetroController {
         }
     }
 
-    // ===== 시스템 정보 API =====
     @GetMapping("/lines")
     public ResponseEntity<ApiResponse> getEnabledLines() {
         try {
@@ -202,7 +199,6 @@ public class MetroController {
                     .build());
         }
     }
-
 
     private boolean isValidLineNumber(Integer lineNumber) {
         try {

@@ -344,7 +344,6 @@ public class AIStoryScheduler {
         private Integer character_sanity;
     }
 
-
     @lombok.Data
     @lombok.Builder
     @lombok.NoArgsConstructor
@@ -399,7 +398,6 @@ public class AIStoryScheduler {
         @JsonProperty("options")
         private List<LLMOptionData> options;
     }
-
 
     @lombok.Data
     @lombok.Builder

@@ -18,6 +18,6 @@ public class LlmStoryRequest {
     private String storyOutline;
     private List<ParticipantContext> participants;
     private List<MessageContext> messageStack;
-    private List<StoryHistoryItem> storyHistory;  // 이전 Phase들의 요약
+    private List<StoryHistoryItem> storyHistory;
     private Boolean isIntro;
 }

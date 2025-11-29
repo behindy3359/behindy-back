@@ -47,7 +47,6 @@ public class LlmIntegrationService {
                     .orElseThrow(() -> new IllegalArgumentException("방을 찾을 수 없습니다"));
 
             if (room.getIsLlmProcessing()) {
-                log.warn("이미 LLM 처리 중: Room {}", roomId);
                 return CompletableFuture.completedFuture(null);
             }
 
@@ -58,7 +57,6 @@ public class LlmIntegrationService {
                     .findActiveParticipantsByRoomId(roomId);
 
             if (activeParticipants.isEmpty()) {
-                log.warn("활성 참여자가 없습니다: Room {}", roomId);
                 room.setIsLlmProcessing(false);
                 roomRepository.save(room);
                 return CompletableFuture.completedFuture(null);
@@ -101,14 +99,10 @@ public class LlmIntegrationService {
             messages = messages.subList(messages.size() - 20, messages.size());
         }
 
-        log.info("대화 스택 조회: Room {} Phase {} - {}개 메시지",
-            roomId, currentPhase, messages.size());
-
         return messages;
     }
 
     private List<StoryHistoryItem> getStoryHistory(Long roomId, Integer currentPhase) {
-        // 최근 5개 Phase의 요약만 조회 (토큰 제한 고려)
         int startPhase = Math.max(1, currentPhase - 4);
 
         List<MultiplayerStoryState> storyStates = storyStateRepository
@@ -151,7 +145,6 @@ public class LlmIntegrationService {
                         .build())
                 .collect(Collectors.toList());
 
-        // 스토리 히스토리 조회 (인트로가 아닐 때만)
         List<StoryHistoryItem> storyHistory = isIntro ? Collections.emptyList() :
                 getStoryHistory(room.getRoomId(), room.getCurrentPhase());
 
@@ -198,9 +191,7 @@ public class LlmIntegrationService {
 
             if (response.getIsEnding()) {
                 room.finish();
-                log.info("스토리 종료: Room {}", room.getRoomId());
 
-                // 엔딩 메시지 브로드캐스트
                 if (response.getEndingSummary() != null) {
                     broadcastEndingMessage(room.getRoomId(), response.getEndingSummary());
                 }
@@ -231,10 +222,8 @@ public class LlmIntegrationService {
 
     @Transactional
     protected void saveStoryState(MultiplayerRoom room, LlmStoryResponse response) {
-        // 구조화된 스토리를 하나의 텍스트로 결합
         String combinedStory = formatStoryContent(response.getStory());
 
-        // context에 endingSummary 저장 (엔딩일 때만)
         Map<String, Object> context = new HashMap<>();
         if (response.getIsEnding() && response.getEndingSummary() != null) {
             context.put("ending_summary", response.getEndingSummary());
@@ -244,13 +233,11 @@ public class LlmIntegrationService {
                 .room(room)
                 .phase(response.getPhase())
                 .llmResponse(combinedStory)
-                .summary(response.getPhaseSummary())  // phase_summary 저장
+                .summary(response.getPhaseSummary())
                 .context(context)
                 .build();
 
         storyStateRepository.save(state);
-        log.info("스토리 상태 저장 완료: Room {} Phase {} Summary: {}",
-            room.getRoomId(), response.getPhase(), response.getPhaseSummary());
     }
 
     private String formatStoryContent(LlmStoryResponse.StoryContent story) {
@@ -274,7 +261,6 @@ public class LlmIntegrationService {
     protected void updateParticipantStates(List<RoomParticipant> participants,
                                            List<CharacterEffect> effects) {
         if (effects == null || effects.isEmpty()) {
-            log.info("HP/Sanity 변화 없음");
             return;
         }
 
@@ -289,7 +275,6 @@ public class LlmIntegrationService {
             String characterName = participant.getCharacter().getCharName();
             CharacterEffect effect = effectMap.get(characterName);
             if (effect != null) {
-                // 변화량이 0이 아닌 경우에만 처리
                 boolean hasHpChange = effect.getHpChange() != null && effect.getHpChange() != 0;
                 boolean hasSanityChange = effect.getSanityChange() != null && effect.getSanityChange() != 0;
 
@@ -305,19 +290,9 @@ public class LlmIntegrationService {
                 if (hasHpChange || hasSanityChange) {
                     participantRepository.save(participant);
 
-                    log.info("참여자 상태 업데이트: {} HP:{}{} Sanity:{}{}",
-                            characterName,
-                            participant.getHp(),
-                            hasHpChange ? (effect.getHpChange() > 0 ? "+" + effect.getHpChange() : effect.getHpChange()) : "",
-                            participant.getSanity(),
-                            hasSanityChange ? (effect.getSanityChange() > 0 ? "+" + effect.getSanityChange() : effect.getSanityChange()) : ""
-                    );
-
-                    // 시스템 메시지 생성 (0이 아닌 경우만)
                     sendStatChangeMessages(participant.getRoom().getRoomId(), characterName, effect);
                 }
 
-                // 사망 체크
                 if (participant.getHp() <= 0 || participant.getSanity() <= 0) {
                     handleParticipantDeath(participant);
                 }
@@ -353,10 +328,6 @@ public class LlmIntegrationService {
         String deathMessage = String.format("%s님이 사망하여 방에서 퇴장합니다.",
             participant.getCharacter().getCharName());
         broadcastSystemMessage(participant.getRoom().getRoomId(), deathMessage);
-
-        log.info("참여자 사망 처리: Room {} Character {}",
-            participant.getRoom().getRoomId(),
-            participant.getCharacter().getCharName());
     }
 
     private void sendAiThinkingMessage(Long roomId) {
@@ -369,7 +340,6 @@ public class LlmIntegrationService {
     }
 
     private void broadcastLlmResponse(Long roomId, LlmStoryResponse response) {
-        // 구조화된 스토리를 하나의 텍스트로 결합
         String combinedStory = formatStoryContent(response.getStory());
 
         ChatMessageResponse storyMessage = chatMessageService.sendLlmMessage(
@@ -379,7 +349,6 @@ public class LlmIntegrationService {
         );
 
         messagingTemplate.convertAndSend("/topic/room/" + roomId, storyMessage);
-        log.info("LLM 응답 브로드캐스트 완료: Room {} Phase {}", roomId, response.getPhase());
     }
 
     private void broadcastParticipantUpdates(Long roomId, List<RoomParticipant> participants) {
@@ -431,7 +400,6 @@ public class LlmIntegrationService {
                     Map.of("type", "ending", "ending_summary", endingSummary)
             );
             messagingTemplate.convertAndSend("/topic/room/" + roomId, endingMsg);
-            log.info("엔딩 메시지 브로드캐스트: Room {}", roomId);
         } catch (Exception e) {
             log.error("엔딩 메시지 브로드캐스트 실패: Room {}", roomId, e);
         }

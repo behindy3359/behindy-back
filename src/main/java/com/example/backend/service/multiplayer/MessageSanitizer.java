@@ -29,7 +29,6 @@ public class MessageSanitizer {
         String cleaned = Jsoup.clean(message, Safelist.none());
 
         if (INJECTION_PATTERN.matcher(cleaned).find()) {
-            log.warn("Potential prompt injection detected: {}", cleaned);
             throw new SecurityException("허용되지 않는 내용이 포함되어 있습니다");
         }
 

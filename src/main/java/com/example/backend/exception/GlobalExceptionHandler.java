@@ -24,7 +24,6 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse> handleAccessDeniedException(AccessDeniedException ex, WebRequest request) {
-        log.warn("접근 권한 오류: {}", ex.getMessage());
         saveErrorLog("AccessDeniedException", ex.getMessage(), ex);
 
         return ResponseEntity
@@ -37,8 +36,6 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiResponse> handleResourceNotFoundException(ResourceNotFoundException ex, WebRequest request) {
-        log.warn("리소스 찾을 수 없음: {}", ex.getMessage());
-
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.builder()
@@ -49,7 +46,6 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse> handleIllegalArgumentException(IllegalArgumentException ex, WebRequest request) {
-        log.warn("잘못된 인자: {}", ex.getMessage());
         saveErrorLog("IllegalArgumentException", ex.getMessage(), ex);
 
         return ResponseEntity
@@ -62,7 +58,6 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ApiResponse> handleIllegalStateException(IllegalStateException ex, WebRequest request) {
-        log.warn("잘못된 상태: {}", ex.getMessage());
         saveErrorLog("IllegalStateException", ex.getMessage(), ex);
 
         return ResponseEntity
