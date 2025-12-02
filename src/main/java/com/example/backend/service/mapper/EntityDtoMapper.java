@@ -217,12 +217,8 @@ public class EntityDtoMapper {
     }
 
     private String getCharacterStatusMessage(Character character) {
-        if (character.isDeleted()) {
-            return "사망";
-        }
-
         if (character.getCharHealth() <= 0 || character.getCharSanity() <= 0) {
-            return "위험 - 즉시 치료 필요";
+            return "사망";
         }
 
         if (character.getCharHealth() <= 20 || character.getCharSanity() <= 20) {
