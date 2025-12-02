@@ -2,6 +2,7 @@ package com.example.backend.controller;
 
 import com.example.backend.dto.auth.ApiResponse;
 import com.example.backend.dto.character.CharacterCreateRequest;
+import com.example.backend.dto.character.CharacterGameStatusResponse;
 import com.example.backend.dto.character.CharacterResponse;
 import com.example.backend.dto.character.VisitedStationResponse;
 import com.example.backend.service.CharacterService;
@@ -42,7 +43,7 @@ public class CharacterController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @Operation(summary = "현재 살아있는 캐릭터 조회", description = "현재 로그인한 사용자의 활성화된(살아있는) 캐릭터 정보를 조회합니다. 인증된 사용자만 사용할 수 있습니다.")
+    @Operation(summary = "현재 캐릭터 게임 상태 조회", description = "현재 로그인한 사용자의 캐릭터 정보와 게임 통계, 진행 중인 게임 정보를 조회합니다. 인증된 사용자만 사용할 수 있습니다.")
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "캐릭터 조회 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
@@ -50,8 +51,8 @@ public class CharacterController {
     })
     @GetMapping("/current")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<CharacterResponse> getCurrentCharacter() {
-        CharacterResponse response = characterService.getCurrentCharacter();
+    public ResponseEntity<CharacterGameStatusResponse> getCurrentCharacter() {
+        CharacterGameStatusResponse response = characterService.getCharacterGameStatus();
         return ResponseEntity.ok(response);
     }
 
