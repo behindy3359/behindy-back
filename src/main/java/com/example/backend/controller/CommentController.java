@@ -1,9 +1,9 @@
 package com.example.backend.controller;
 
 import com.example.backend.dto.comment.CommentCreateRequest;
-import com.example.backend.dto.comment.CommentListResponse;
 import com.example.backend.dto.comment.CommentResponse;
 import com.example.backend.dto.comment.CommentUpdateRequest;
+import com.example.backend.dto.common.PageResponse;
 import com.example.backend.service.CommentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -56,12 +56,12 @@ public class CommentController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "게시글을 찾을 수 없음")
     })
     @GetMapping("/posts/{postId}")
-    public ResponseEntity<CommentListResponse> getCommentsByPost(
+    public ResponseEntity<PageResponse<CommentResponse>> getCommentsByPost(
             @Parameter(description = "댓글을 조회할 게시글 ID", required = true) @PathVariable Long postId,
             @Parameter(description = "페이지 번호 (0부터 시작, 기본값: 0)", required = false) @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "페이지당 댓글 수 (기본값: 10)", required = false) @RequestParam(defaultValue = "10") int size) {
 
-        CommentListResponse response = commentService.getCommentsByPost(postId, page, size);
+        PageResponse<CommentResponse> response = commentService.getCommentsByPost(postId, page, size);
         return ResponseEntity.ok(response);
     }
 
@@ -104,11 +104,11 @@ public class CommentController {
     })
     @GetMapping("/my")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<CommentListResponse> getMyComments(
+    public ResponseEntity<PageResponse<CommentResponse>> getMyComments(
             @Parameter(description = "페이지 번호 (0부터 시작, 기본값: 0)", required = false) @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "페이지당 댓글 수 (기본값: 10)", required = false) @RequestParam(defaultValue = "10") int size) {
 
-        CommentListResponse response = commentService.getMyComments(page, size);
+        PageResponse<CommentResponse> response = commentService.getMyComments(page, size);
         return ResponseEntity.ok(response);
     }
 

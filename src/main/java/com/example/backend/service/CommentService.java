@@ -1,9 +1,9 @@
 package com.example.backend.service;
 
 import com.example.backend.dto.comment.CommentCreateRequest;
-import com.example.backend.dto.comment.CommentListResponse;
 import com.example.backend.dto.comment.CommentResponse;
 import com.example.backend.dto.comment.CommentUpdateRequest;
+import com.example.backend.dto.common.PageResponse;
 import com.example.backend.entity.Comment;
 import com.example.backend.entity.CommentLike;
 import com.example.backend.entity.Post;
@@ -68,7 +68,7 @@ public class CommentService {
     }
 
     @Transactional(readOnly = true)
-    public CommentListResponse getCommentsByPost(Long postId, int page, int size) {
+    public PageResponse<CommentResponse> getCommentsByPost(Long postId, int page, int size) {
         Post post = postRepository.findById(postId)
                 .filter(p -> !p.isDeleted())
                 .orElseThrow(() -> new ResourceNotFoundException("Post", "id", postId));
@@ -76,19 +76,7 @@ public class CommentService {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<Comment> commentsPage = commentRepository.findByPostIdAndNotDeleted(postId, pageable);
 
-        List<CommentResponse> comments = commentsPage.getContent().stream()
-                .map(entityDtoMapper::toCommentResponse)
-                .collect(Collectors.toList());
-
-        return CommentListResponse.builder()
-                .comments(comments)
-                .page(pageable.getPageNumber())
-                .size(pageable.getPageSize())
-                .totalElements(commentsPage.getTotalElements())
-                .totalPages(commentsPage.getTotalPages())
-                .hasNext(commentsPage.hasNext())
-                .hasPrevious(commentsPage.hasPrevious())
-                .build();
+        return PageResponse.of(commentsPage, entityDtoMapper::toCommentResponse);
     }
 
     @Transactional
@@ -128,24 +116,12 @@ public class CommentService {
     }
 
     @Transactional(readOnly = true)
-    public CommentListResponse getMyComments(int page, int size) {
+    public PageResponse<CommentResponse> getMyComments(int page, int size) {
         User currentUser = authService.getCurrentUser();
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<Comment> commentsPage = commentRepository.findByUserActive(currentUser, pageable);
 
-        List<CommentResponse> comments = commentsPage.getContent().stream()
-                .map(entityDtoMapper::toCommentResponse)
-                .collect(Collectors.toList());
-
-        return CommentListResponse.builder()
-                .comments(comments)
-                .page(pageable.getPageNumber())
-                .size(pageable.getPageSize())
-                .totalElements(commentsPage.getTotalElements())
-                .totalPages(commentsPage.getTotalPages())
-                .hasNext(commentsPage.hasNext())
-                .hasPrevious(commentsPage.hasPrevious())
-                .build();
+        return PageResponse.of(commentsPage, entityDtoMapper::toCommentResponse);
     }
 
     @Transactional
