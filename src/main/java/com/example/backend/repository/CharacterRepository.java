@@ -2,7 +2,7 @@ package com.example.backend.repository;
 
 import com.example.backend.entity.Character;
 import com.example.backend.entity.User;
-import org.springframework.data.jpa.repository.JpaRepository;
+import com.example.backend.repository.common.UserOwnedSoftDeleteRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface CharacterRepository extends JpaRepository<Character, Long> {
+public interface CharacterRepository extends UserOwnedSoftDeleteRepository<Character, Long> {
 
     @Query("SELECT c FROM Character c WHERE c.user = :user AND c.deletedAt IS NULL")
     Optional<Character> findByUserAndDeletedAtIsNull(@Param("user") User user);
