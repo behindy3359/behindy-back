@@ -1,7 +1,7 @@
 package com.example.backend.service;
 
+import com.example.backend.dto.common.PageResponse;
 import com.example.backend.dto.post.PostCreateRequest;
-import com.example.backend.dto.post.PostListResponse;
 import com.example.backend.dto.post.PostResponse;
 import com.example.backend.dto.post.PostUpdateRequest;
 import com.example.backend.entity.Post;
@@ -87,20 +87,9 @@ public class PostService {
     }
 
     @Transactional(readOnly = true)
-    public PostListResponse getAllPosts(Pageable pageable) {
+    public PageResponse<PostResponse> getAllPosts(Pageable pageable) {
         Page<Post> postsPage = postRepository.findAllActive(pageable);
-
-        List<PostResponse> posts = postsPage.getContent().stream()
-                .map(entityDtoMapper::toPostResponse)
-                .collect(Collectors.toList());
-
-        return PostListResponse.builder()
-                .posts(posts)
-                .page(pageable.getPageNumber())
-                .size(pageable.getPageSize())
-                .totalElements(postsPage.getTotalElements())
-                .totalPages(postsPage.getTotalPages())
-                .build();
+        return PageResponse.of(postsPage, entityDtoMapper::toPostResponse);
     }
 
     @Caching(evict = {

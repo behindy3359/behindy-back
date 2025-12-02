@@ -1,8 +1,8 @@
 package com.example.backend.controller;
 
 import com.example.backend.dto.auth.ApiResponse;
+import com.example.backend.dto.common.PageResponse;
 import com.example.backend.dto.post.PostCreateRequest;
-import com.example.backend.dto.post.PostListResponse;
 import com.example.backend.dto.post.PostResponse;
 import com.example.backend.dto.post.PostUpdateRequest;
 import com.example.backend.service.PostService;
@@ -57,13 +57,13 @@ public class PostController {
 
     @Operation(summary = "게시글 목록 조회", description = "전체 게시글 목록을 페이지네이션하여 조회합니다. 최신 글이 먼저 표시됩니다.")
     @GetMapping
-    public ResponseEntity<PostListResponse> getAllPosts(
+    public ResponseEntity<PageResponse<PostResponse>> getAllPosts(
             @Parameter(description = "페이지 번호 (0부터 시작, 기본값: 0)", required = false) @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "페이지당 게시글 수 (기본값: 10)", required = false) @RequestParam(defaultValue = "10") int size) {
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
 
-        PostListResponse response = postService.getAllPosts(pageable);
+        PageResponse<PostResponse> response = postService.getAllPosts(pageable);
         return ResponseEntity.ok(response);
     }
 
