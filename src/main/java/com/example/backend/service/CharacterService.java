@@ -110,7 +110,7 @@ public class CharacterService {
         Character character = characterRepository.findByUserAndDeletedAtIsNull(currentUser)
                 .orElseThrow(() -> new ResourceNotFoundException("Character", "user", currentUser.getUserId()));
 
-        boolean isAlive = !character.isDeleted();
+        boolean isAlive = character.getCharHealth() > 0 && character.getCharSanity() > 0;
         boolean isDying = isAlive && (character.getCharHealth() <= 20 || character.getCharSanity() <= 20);
         String statusMessage = getCharacterStatusMessage(character);
 
