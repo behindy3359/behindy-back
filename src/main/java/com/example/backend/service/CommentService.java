@@ -131,7 +131,7 @@ public class CommentService {
     public CommentListResponse getMyComments(int page, int size) {
         User currentUser = authService.getCurrentUser();
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        Page<Comment> commentsPage = commentRepository.findByUserAndNotDeleted(currentUser, pageable);
+        Page<Comment> commentsPage = commentRepository.findByUserActive(currentUser, pageable);
 
         List<CommentResponse> comments = commentsPage.getContent().stream()
                 .map(entityDtoMapper::toCommentResponse)
