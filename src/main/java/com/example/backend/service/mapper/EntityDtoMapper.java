@@ -100,8 +100,7 @@ public class EntityDtoMapper {
             return null;
         }
 
-        boolean isAlive = character.getCharHealth() > 0 && character.getCharSanity() > 0;
-        boolean isDying = isAlive && (character.getCharHealth() <= 20 || character.getCharSanity() <= 20);
+        boolean alive = character.getCharHealth() > 0 && character.getCharSanity() > 0;
         String statusMessage = getCharacterStatusMessage(character);
 
         boolean hasGameProgress = false;
@@ -121,8 +120,7 @@ public class EntityDtoMapper {
                 .charName(character.getCharName())
                 .charHealth(character.getCharHealth())
                 .charSanity(character.getCharSanity())
-                .isAlive(isAlive)
-                .isDying(isDying)
+                .alive(alive)
                 .statusMessage(statusMessage)
                 .hasGameProgress(hasGameProgress)
                 .currentStoryId(currentStoryId)

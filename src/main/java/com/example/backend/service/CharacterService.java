@@ -110,8 +110,7 @@ public class CharacterService {
         Character character = characterRepository.findByUserAndDeletedAtIsNull(currentUser)
                 .orElseThrow(() -> new ResourceNotFoundException("Character", "user", currentUser.getUserId()));
 
-        boolean isAlive = character.getCharHealth() > 0 && character.getCharSanity() > 0;
-        boolean isDying = isAlive && (character.getCharHealth() <= 20 || character.getCharSanity() <= 20);
+        boolean alive = character.getCharHealth() > 0 && character.getCharSanity() > 0;
         String statusMessage = getCharacterStatusMessage(character);
 
         Optional<Now> activeGame = nowRepository.findByCharacterIdWithPage(character.getCharId());
@@ -139,10 +138,10 @@ public class CharacterService {
         Long totalPlays = logERepository.countTotalPlaysByCharacter(character.getCharId());
         Double clearRate = totalPlays > 0 ? (double) totalClears / totalPlays * 100 : 0.0;
 
-        boolean canEnterNewGame = isAlive && !hasActiveGame && character.getCharHealth() > 0 && character.getCharSanity() > 0;
+        boolean canEnterNewGame = alive && !hasActiveGame && character.getCharHealth() > 0 && character.getCharSanity() > 0;
         String cannotEnterReason = null;
 
-        if (!isAlive) {
+        if (!alive) {
             cannotEnterReason = "캐릭터가 사망한 상태입니다.";
         } else if (hasActiveGame) {
             cannotEnterReason = "이미 진행 중인 게임이 있습니다.";
@@ -155,8 +154,7 @@ public class CharacterService {
                 .charName(character.getCharName())
                 .charHealth(character.getCharHealth())
                 .charSanity(character.getCharSanity())
-                .isAlive(isAlive)
-                .isDying(isDying)
+                .alive(alive)
                 .statusMessage(statusMessage)
                 .hasActiveGame(hasActiveGame)
                 .currentStoryId(currentStoryId)

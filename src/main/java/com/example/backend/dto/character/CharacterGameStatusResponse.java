@@ -28,10 +28,7 @@ public class CharacterGameStatusResponse {
     private Integer charSanity;
 
     @Schema(description = "생존 여부", example = "true")
-    private boolean isAlive;
-
-    @Schema(description = "위험 상태 여부 (체력/정신력 < 30)", example = "false")
-    private boolean isDying;
+    private boolean alive;
 
     @Schema(description = "상태 메시지", example = "건강함")
     private String statusMessage;
