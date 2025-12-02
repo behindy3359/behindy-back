@@ -240,8 +240,6 @@ public class AuthService {
                 Set<String> activeTokens = redisService.getAllRefreshTokensForUser(String.valueOf(user.getUserId()));
 
                 if (activeTokens.isEmpty()) {
-                    log.info("Demo account available: {}", demoAccount.getEmail());
-
                     LoginRequest loginRequest = new LoginRequest();
                     loginRequest.setEmail(demoAccount.getEmail());
                     loginRequest.setPassword(demoAccount.getPassword());

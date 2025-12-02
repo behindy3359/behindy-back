@@ -394,11 +394,9 @@ public class AuthController {
     
     @PostMapping("/demo-login")
     public ResponseEntity<?> demoLogin(HttpServletResponse response) {
-        log.info("데모 로그인 요청");
-
         try {
             JwtAuthResponse authResponse = authService.demoLogin(response);
-            log.info("데모 로그인 성공: userId={}, email={}", authResponse.getUserId(), authResponse.getEmail());
+            log.info("데모 로그인 성공: userId={}", authResponse.getUserId());
             return ResponseEntity.ok(authResponse);
         } catch (IllegalStateException e) {
             log.warn("데모 로그인 실패: {}", e.getMessage());

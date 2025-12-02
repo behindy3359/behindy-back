@@ -89,7 +89,6 @@ public class RedisService {
             String pattern = "RT:" + userId + ":*";
             var keys = redisTemplate.keys(pattern);
             if (keys != null && !keys.isEmpty()) {
-                log.debug("사용자 {}의 활성 Refresh Token: {} 개", userId, keys.size());
                 return keys;
             }
             return java.util.Collections.emptySet();
