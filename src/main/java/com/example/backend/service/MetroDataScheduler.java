@@ -61,7 +61,7 @@ public class MetroDataScheduler {
 
     private boolean isOperatingHours() {
         int currentHour = LocalDateTime.now().getHour();
-        return currentHour >= 5 && currentHour < 24;
+        return currentHour >= 6 && currentHour < 24;
     }
 
     public void updateAllMetroPositions() {
