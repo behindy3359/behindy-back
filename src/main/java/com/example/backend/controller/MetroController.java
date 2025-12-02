@@ -37,7 +37,6 @@ public class MetroController {
 
             if (cacheData != null && metroCacheService.isCacheValid(cacheData)) {
                 MetroPositionResponse positions = convertCacheToResponse(cacheData);
-                log.debug("전체 노선 실시간 데이터 반환: {}대", positions.getTotalTrains());
 
                 return ResponseEntity.ok(ApiResponse.builder()
                         .success(true)
@@ -47,7 +46,6 @@ public class MetroController {
             }
 
             MetroPositionResponse positions = metroPositionService.getAllPositions();
-            log.debug("전체 노선 Mock 데이터 반환: {}대", positions != null ? positions.getTotalTrains() : 0);
 
             return ResponseEntity.ok(ApiResponse.builder()
                     .success(true)
@@ -79,7 +77,6 @@ public class MetroController {
 
             if (cacheData != null && metroCacheService.isCacheValid(cacheData)) {
                 MetroPositionResponse positions = convertCacheToResponse(cacheData);
-                log.debug("{}호선 실시간 데이터 반환: {}대", lineNumber, positions.getTotalTrains());
 
                 return ResponseEntity.ok(ApiResponse.builder()
                         .success(true)
@@ -89,7 +86,6 @@ public class MetroController {
             }
 
             MetroPositionResponse positions = metroPositionService.getLinePositions(lineNumber);
-            log.debug("{}호선 Mock 데이터 반환: {}대", lineNumber, positions != null ? positions.getTotalTrains() : 0);
 
             return ResponseEntity.ok(ApiResponse.builder()
                     .success(true)
