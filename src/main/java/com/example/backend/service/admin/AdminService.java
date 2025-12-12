@@ -12,7 +12,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -27,7 +26,6 @@ public class AdminService {
     private final CommentRepository commentRepository;
     private final StoryRepository storyRepository;
     private final StationRepository stationRepository;
-    private final CharacterRepository characterRepository;
 
     public AdminStatsDTO getStats() {
         LocalDateTime now = LocalDateTime.now();

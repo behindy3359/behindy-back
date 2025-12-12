@@ -5,7 +5,6 @@ import com.example.backend.dto.metro.MetroPositionResponse;
 import com.example.backend.dto.metro.TrainPosition;
 import com.example.backend.service.MetroPositionService;
 import com.example.backend.service.MetroCacheService;
-import com.example.backend.service.MetroStationFilter;
 import com.example.backend.service.MetroDataScheduler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,7 +26,6 @@ public class MetroController {
 
     private final MetroPositionService metroPositionService;
     private final MetroCacheService metroCacheService;
-    private final MetroStationFilter stationFilter;
     private final MetroDataScheduler dataScheduler;
 
     @GetMapping("/positions")

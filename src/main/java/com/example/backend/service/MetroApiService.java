@@ -1,7 +1,6 @@
 package com.example.backend.service;
 
 import com.example.backend.dto.metro.*;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -185,13 +184,6 @@ public class MetroApiService {
                 !apiKey.equals("test_key") &&
                 !apiKey.equals("TEMP_KEY") &&
                 apiKey.length() > 10;
-    }
-
-    private String maskApiKey(String key) {
-        if (key == null || key.length() < 8) {
-            return "INVALID";
-        }
-        return key.substring(0, 4) + "****" + key.substring(key.length() - 4);
     }
 
     private List<String> getStationsForLine(String lineNumber) {

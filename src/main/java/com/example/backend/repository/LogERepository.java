@@ -1,8 +1,6 @@
 package com.example.backend.repository;
 
-import com.example.backend.entity.Character;
 import com.example.backend.entity.LogE;
-import com.example.backend.entity.Story;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -10,7 +8,6 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 @Repository
 public interface LogERepository extends JpaRepository<LogE, Long> {

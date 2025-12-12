@@ -1,8 +1,6 @@
 package com.example.backend.repository;
 
-import com.example.backend.entity.Character;
 import com.example.backend.entity.LogO;
-import com.example.backend.entity.Options;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

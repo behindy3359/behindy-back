@@ -4,7 +4,6 @@ import com.example.backend.config.DemoAccountConfig;
 import com.example.backend.dto.auth.JwtAuthResponse;
 import com.example.backend.dto.auth.LoginRequest;
 import com.example.backend.dto.auth.SignupRequest;
-import com.example.backend.dto.auth.TokenRefreshRequest;
 import com.example.backend.entity.User;
 import com.example.backend.exception.ResourceNotFoundException;
 import com.example.backend.exception.TokenRefreshException;
