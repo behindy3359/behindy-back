@@ -11,11 +11,8 @@
 - **Cache**: Redis 7
 - **Security**: Spring Security 6 + JWT (jjwt 0.11.5)
 - **WebSocket**: Spring WebSocket + STOMP
-- **HTTP Client**: WebFlux WebClient
 - **API Documentation**: SpringDoc OpenAPI 2.7
 - **ORM**: Spring Data JPA + Hibernate
-- **Utilities**: Lombok 1.18, Jsoup 1.15 (XSS 방지)
-- **Test**: JUnit 5, Mockito, Spring Security Test
 
 ## 주요 기능
 
@@ -27,7 +24,7 @@
 
 ### 게임 (Game)
 - 지하철 역 및 호선 기반 게임 시작
-- 캐릭터 생성 및 관리 (이름, HP, Sanity)
+- 캐릭터 생성 및 관리
 - 선택지에 따른 스토리 분기 처리
 - 게임 상태 추적 및 히스토리 관리
 - 멀티플레이어 룸 생성 및 참여
@@ -40,10 +37,9 @@
 - 조회수 및 통계 관리
 
 ### AI 스토리 생성
-- LLM Server (FastAPI)와 WebClient 연동
+- LLM Server와 WebClient 연동
 - 역 정보 기반 스토리 자동 생성
 - 배치 작업 스케줄링
-- Mock Provider 지원 (개발 환경)
 
 ### 지하철 실시간 정보
 - 서울 열린데이터광장 API 연동
