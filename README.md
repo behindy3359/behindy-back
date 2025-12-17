@@ -4,15 +4,12 @@
 
 ## 기술 스택
 
-- **Framework**: Spring Boot 3.4.5
-- **Language**: Java 21
-- **Build Tool**: Gradle 8.x
-- **Database**: PostgreSQL 15
-- **Cache**: Redis 7
-- **Security**: Spring Security 6 + JWT (jjwt 0.11.5)
-- **WebSocket**: Spring WebSocket + STOMP
-- **API Documentation**: SpringDoc OpenAPI 2.7
-- **ORM**: Spring Data JPA + Hibernate
+- **Spring Boot 3.4** (Java 21)
+- **PostgreSQL 15** - 메인 데이터베이스
+- **Redis 7** - 캐싱 및 세션 관리
+- **Spring Security + JWT** - 인증/인가
+- **WebSocket (STOMP)** - 실시간 멀티플레이어
+- **SpringDoc OpenAPI** - API 문서화
 
 ## 주요 기능
 
@@ -115,7 +112,6 @@ SEOUL_METRO_API_ENABLED=true
 
 ### 요구사항
 - Java 21
-- Gradle 8.x
 - PostgreSQL 15
 - Redis 7
 
